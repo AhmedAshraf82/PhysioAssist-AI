@@ -24,3 +24,24 @@ python-dotenv>=1.0.0
 # Development
 pytest>=7.4.0
 black>=23.7.0
+
+
+
+# Requirements for Autogen Chatbot Backend
+# Python 3.10+ required
+
+# Web Framework
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+pydantic
+
+# Autogen Libraries
+autogen-agentchat
+autogen-core
+autogen-ext[openai]
+
+# OpenAI
+openai
+
+# Additional utilities
+python-dotenv==1.0.0
