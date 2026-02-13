@@ -54,9 +54,9 @@ class FileMemory(Memory):
         except Exception as e:
             print(f"Error saving memory file: {e}")
 
-    async def add(self, memory: MemoryContent) -> None:
+    async def add(self, message: str, role: str) -> None:
         """Add a new memory item and persist to file."""
-        self._buffer.append(memory)
+        self._buffer.append(MemoryContent(content=message, mime_type=MemoryMimeType.TEXT, metadata={"role": role}))
         self._save_file()
 
     async def query(self, query_str: str) -> List[MemoryContent]:

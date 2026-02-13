@@ -14,17 +14,20 @@ class Settings(BaseSettings):
     API_PREFIX: str = "/api/v1"
     DEBUG: bool = False
     
-    # CORS
-    BACKEND_CORS_ORIGINS: list[str] = ["http://localhost:3000"]
     
     # Project Paths
     ROOT_DIR: Path = Path(__file__).parent.parent.parent.parent
-    MODEL_DIR: Path = ROOT_DIR / "models"
-    DATA_DIR: Path = ROOT_DIR / "data"
+    USER_CHATS_DIR: Path = ROOT_DIR / "user_chats"
+    
+    # API Keys (optional - will be loaded from .env if present)
+    OPENAI_API_KEY: str | None = None
+    GROK_API_KEY: str | None = None
+    GEMINI_API_KEY: str | None = None
     
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "ignore"  # Allow extra fields from .env
 
 
 settings = Settings()
