@@ -1,6 +1,7 @@
 """
 Core configuration settings for PhysioAssist-AI
 """
+import os
 from pydantic_settings import BaseSettings
 from pathlib import Path
 
@@ -18,6 +19,32 @@ class Settings(BaseSettings):
     # Project Paths
     ROOT_DIR: Path = Path(__file__).parent.parent.parent.parent
     USER_CHATS_DIR: Path = ROOT_DIR / "user_chats"
+    
+    # RAG Search Configuration
+    INDEX_NAME: str = "physio_info"
+    RAG_TOP_K: int = 3  
+    SEARCH_SERVICE_TYPE: str = "elasticsearch"  # or "pinecone", "weaviate", etc.
+    
+    # Elasticsearch Configuration
+    ELASTICSEARCH_HOST: str = "localhost"
+    ELASTICSEARCH_PORT: int = 9200
+    ELASTICSEARCH_SCHEME: str = "https"
+    ELASTIC_CERT_PATH: str = os.path.join(ROOT_DIR, "certs/elasticsearch/elastic-cert.crt")
+    
+    
+    # OpenSearch Configuration
+    OPENSEARCH_HOST: str = "localhost"
+    OPENSEARCH_PORT: int = 9201
+    OPENSEARCH_SCHEME: str = "https"
+    OPENSEARCH_CERT_PATH: str = os.path.join(ROOT_DIR, "certs/opensearch/root-ca.pem")
+    
+    
+
+
+    # Embedding Configuration
+    EMBEDDING_MODEL: str = "text-embedding-3-small"  # OpenAI embedding model
+    EMBEDDING_PROVIDER: str = "openai"  # 'openai' or 'bedrock'
+    VECTOR_DIMENSIONS: int = 1536  # 1536 for text-embedding-3-small/ada-002, 3072 for text-embedding-3-large
     
     # API Keys (optional - will be loaded from .env if present)
     OPENAI_API_KEY: str | None = None

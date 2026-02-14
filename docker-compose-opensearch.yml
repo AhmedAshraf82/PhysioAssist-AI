@@ -1,0 +1,23 @@
+
+services:
+  opensearch:
+    image: opensearchproject/opensearch:latest
+    container_name: opensearch
+    environment:
+      - discovery.type=single-node
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=OpenSearch@1
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - 9201:9200
+    volumes:
+      - ./certs/opensearch/root-ca.pem:/usr/share/opensearch/config/root-ca.pem:Z
+    networks:
+      - opens
+
+networks:
+  opens:
+    name: opens
+
+
+
+

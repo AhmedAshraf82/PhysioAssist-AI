@@ -82,5 +82,40 @@
     "metadata": {
       "role": "assistant"
     }
+  },
+  {
+    "content": "Hello! Can you help me with my physiotherapy questions?",
+    "mime_type": "TEXT",
+    "metadata": {
+      "role": "user"
+    }
+  },
+  {
+    "content": "Hello! Can you help me with my physiotherapy questions?",
+    "mime_type": "TEXT",
+    "metadata": {
+      "role": "user"
+    }
+  },
+  {
+    "content": "Of course, Ahmed! I'm here to help with your physiotherapy questions. What would you like to know today?",
+    "mime_type": "TEXT",
+    "metadata": {
+      "role": "assistant"
+    }
+  },
+  {
+    "content": "Hello! Can you help me with my physiotherapy questions?",
+    "mime_type": "TEXT",
+    "metadata": {
+      "role": "user"
+    }
+  },
+  {
+    "content": "Of course, Ahmed! I'm here to help with your physiotherapy questions. What would you like to know today?",
+    "mime_type": "TEXT",
+    "metadata": {
+      "role": "assistant"
+    }
   }
 ]
