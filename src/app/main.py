@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 
 from src.app.routers.chat import prediagnose
 from src.app.routers.data import ingestion
+from src.app.routers import search
 
 load_dotenv()
 
@@ -17,6 +18,7 @@ app = FastAPI(
 # Include routers
 app.include_router(prediagnose.router)
 app.include_router(ingestion.router)
+app.include_router(search.router)
 
 
 @app.get("/", tags=["Root"])
