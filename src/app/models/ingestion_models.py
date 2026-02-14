@@ -18,6 +18,14 @@ class IngestionRequest(BaseModel):
     )
 
 
+class IndexInfoRequest(BaseModel):
+    """Request model for index information query."""
+    index_name: Optional[str] = Field(
+        default=None,
+        description="Name of the index. Defaults to configured INDEX_NAME."
+    )
+
+
 class IngestionResponse(BaseModel):
     """Response model for data ingestion."""
     success: bool
@@ -25,21 +33,9 @@ class IngestionResponse(BaseModel):
     index_name: str
     index_created: bool
     index_existed: bool
-    initial_document_count: int = Field(
-        default=0,
-        description="Number of documents in index before operation"
-    )
-    documents_deleted: int = Field(
-        default=0,
-        description="Number of documents deleted (if index was recreated)"
-    )
     documents_fetched: int
     documents_indexed: int
     documents_failed: int
-    final_document_count: int = Field(
-        default=0,
-        description="Number of documents in index after operation"
-    )
     errors: list[str]
 
 
@@ -51,3 +47,10 @@ class IndexInfoResponse(BaseModel):
     vector_dimensions: int
     embedding_provider: str
     embedding_model: str
+
+
+class IndexListResponse(BaseModel):
+    """Response model for list of indexes."""
+    total_count: int
+    indexes: list[str]
+    search_service_type: str

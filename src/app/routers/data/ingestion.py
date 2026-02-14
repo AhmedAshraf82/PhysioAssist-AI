@@ -3,13 +3,15 @@ Data ingestion API endpoints.
 Handles data ingestion pipeline execution and index management.
 """
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException
 from typing import Dict, Any, Optional
 from src.app.services.data_ingestion_pipeline import DataIngestionPipeline
 from src.app.models.ingestion_models import (
     IngestionRequest,
     IngestionResponse,
-    IndexInfoResponse
+    IndexInfoRequest,
+    IndexInfoResponse,
+    IndexListResponse
 )
 from src.app.core.config import settings
 from src.app.utils.logger import setup_logger
@@ -79,10 +81,7 @@ async def ingest_data(request: IngestionRequest) -> IngestionResponse:
 
 @router.get("/index-info", response_model=IndexInfoResponse, summary="Get index information")
 async def get_index_info(
-    index_name: Optional[str] = Query(
-        default=None,
-        description="Name of the index. Defaults to configured INDEX_NAME."
-    )
+    index_name: Optional[str] = None
 ) -> IndexInfoResponse:
     """
     Get information about a vector store index.
@@ -94,7 +93,7 @@ async def get_index_info(
     - Embedding configuration
     
     Args:
-        index_name: Name of the index to query
+        index_name: Name of the index to query (defaults to configured INDEX_NAME)
         
     Returns:
         IndexInfoResponse: Index information and statistics
@@ -120,6 +119,37 @@ async def get_index_info(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to get index info: {str(e)}"
+        )
+
+
+@router.get("/list-indexes", response_model=IndexListResponse, summary="List all indexes")
+async def list_indexes() -> IndexListResponse:
+    """
+    List all indexes in the vector store.
+    
+    Returns a list of all index names along with the total count.
+    System indexes (starting with '.') are excluded.
+    
+    Returns:
+        IndexListResponse: List of all index names and count
+    """
+    logger.info("Listing all indexes")
+    
+    try:
+        pipeline = DataIngestionPipeline()
+        indexes = pipeline.list_all_indexes()
+        
+        return IndexListResponse(
+            total_count=len(indexes),
+            indexes=indexes,
+            search_service_type=settings.SEARCH_SERVICE_TYPE
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to list indexes: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to list indexes: {str(e)}"
         )
 
 

@@ -133,3 +133,18 @@ class IndexCreationService:
         except Exception as e:
             logger.error(f"✗ Error getting document count: {e}")
             return 0
+    
+    def list_indexes(self) -> List[str]:
+        """
+        List all indexes in the search service.
+        
+        Returns:
+            List[str]: List of index names
+        """
+        try:
+            indexes = self.search_service.list_indexes()
+            logger.debug(f"Found {len(indexes)} indexes")
+            return indexes
+        except Exception as e:
+            logger.error(f"✗ Error listing indexes: {e}")
+            return []

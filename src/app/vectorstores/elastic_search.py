@@ -144,7 +144,7 @@ class ElasticSearchService(BaseSearchService):
             bool: True if index exists
         """
         try:
-            return self.client.indices.exists(index=index_name)
+            return bool(self.client.indices.exists(index=index_name))
         except Exception as e:
             print(f"Error checking index existence: {e}")
             return False
@@ -164,8 +164,22 @@ class ElasticSearchService(BaseSearchService):
             return response["count"]
         except Exception as e:
             print(f"Error getting document count: {e}")
-            return -1
-
+            return -1    
+    def list_indexes(self) -> List[str]:
+        """
+        List all indexes in Elasticsearch
+        
+        Returns:
+            List[str]: List of index names
+        """
+        try:
+            # Get all indices, excluding system indices (starting with .)
+            response = self.client.cat.indices(format="json")
+            indexes = [idx["index"] for idx in response if not idx["index"].startswith(".")]
+            return indexes
+        except Exception as e:
+            print(f"Error listing indexes: {e}")
+            return []
     def clear_index(self, index_name: str) -> bool:
         """
         Delete all documents from an index without deleting the index itself

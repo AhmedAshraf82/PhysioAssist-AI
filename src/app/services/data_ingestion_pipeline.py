@@ -77,12 +77,9 @@ class DataIngestionPipeline:
             "index_name": index_name,
             "index_created": False,
             "index_existed": False,
-            "initial_document_count": 0,
-            "documents_deleted": 0,
             "documents_fetched": 0,
             "documents_indexed": 0,
             "documents_failed": 0,
-            "final_document_count": 0,
             "errors": [],
             "message": ""
         }
@@ -95,13 +92,8 @@ class DataIngestionPipeline:
             # Check if index exists
             if index_service.index_exists(index_name):
                 results["index_existed"] = True
-                # Get initial document count
-                results["initial_document_count"] = index_service.get_document_count(index_name)
-                logger.info(f"Index '{index_name}' exists with {results['initial_document_count']} documents")
-                
                 if recreate_index:
-                    logger.info(f"Recreating index (will delete {results['initial_document_count']} documents)...")
-                    results["documents_deleted"] = results["initial_document_count"]
+                    logger.info(f"Index '{index_name}' exists. Recreating...")
                     index_service.delete_index(index_name)
                     create_success = index_service.create_index(
                         index_name=index_name,
@@ -167,34 +159,20 @@ class DataIngestionPipeline:
             
             # Step 4: Verify indexing
             logger.info("\n--- STEP 4: Verification ---")
-            results["final_document_count"] = index_service.get_document_count(index_name)
-            logger.info(f"✓ Final document count in index: {results['final_document_count']}")
-            
-            # Create detailed message
-            message_parts = []
-            if results["index_existed"]:
-                message_parts.append(f"Index contained {results['initial_document_count']} docs")
-            if results["documents_deleted"] > 0:
-                message_parts.append(f"{results['documents_deleted']} deleted")
-            message_parts.append(f"{results['documents_fetched']} fetched")
-            message_parts.append(f"{results['documents_indexed']} indexed")
-            if results["documents_failed"] > 0:
-                message_parts.append(f"{results['documents_failed']} failed")
-            message_parts.append(f"Current index count: {results['final_document_count']}")
-            
-            detailed_message = ", ".join(message_parts)
+            doc_count = index_service.get_document_count(index_name)
+            logger.info(f"✓ Final document count in index: {doc_count}")
             
             # Determine success
             if results["documents_indexed"] == results["documents_fetched"]:
                 results["success"] = True
-                results["message"] = f"Successfully ingested all documents. {detailed_message}"
+                results["message"] = f"Successfully ingested {results['documents_indexed']} documents"
                 logger.info("✓ Data ingestion completed successfully!")
             elif results["documents_indexed"] > 0:
                 results["success"] = True
-                results["message"] = f"Partially successful. {detailed_message}"
+                results["message"] = f"Partially successful: {results['documents_indexed']}/{results['documents_fetched']} documents indexed"
                 logger.warning(f"⚠️  Partial success: {results['documents_indexed']}/{results['documents_fetched']} documents indexed")
             else:
-                results["message"] = f"Failed to index any documents. {detailed_message}"
+                results["message"] = "Failed to index any documents"
                 logger.error("✗ Failed to index any documents")
             
             logger.info("="*80)
@@ -243,6 +221,23 @@ class DataIngestionPipeline:
                 "exists": False,
                 "error": str(e)
             }
+
+
+    def list_all_indexes(self) -> List[str]:
+        """
+        List all indexes in the search service.
+        
+        Returns:
+            List[str]: List of all index names
+        """
+        try:
+            index_service = IndexCreationService(search_service_type=self.search_service_type)
+            indexes = index_service.list_indexes()
+            logger.info(f"Found {len(indexes)} indexes")
+            return indexes
+        except Exception as e:
+            logger.error(f"Error listing indexes: {e}")
+            return []
 
 
 def run_ingestion_pipeline(
