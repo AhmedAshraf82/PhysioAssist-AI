@@ -1,5 +1,69 @@
 # PhysioAssist AI - Deployment Guide
 
+## Cloud Services Used
+
+### 🗄️ MongoDB Atlas
+**Database Service** - Cloud-hosted MongoDB for persistent data storage
+
+- **Provider**: MongoDB Atlas (https://www.mongodb.com/atlas)
+- **Tier**: Free (M0 Sandbox)
+- **Region**: Choose closest to your deployment
+- **Purpose**: Stores injury data, chat sessions, and application state
+- **Connection**: Via connection string environment variable
+- **Setup**:
+  1. Create account at https://www.mongodb.com/cloud/atlas/register
+  2. Create a free M0 cluster
+  3. Configure network access (allow from anywhere: 0.0.0.0/0)
+  4. Create database user
+  5. Get connection string and add to environment variables
+
+### 🔍 Elastic Cloud
+**Search Service** - Managed Elasticsearch for semantic search
+
+- **Provider**: Elastic Cloud (https://cloud.elastic.co)
+- **Tier**: Free trial (14 days, then paid)
+- **Region**: Choose closest to your deployment
+- **Version**: Elasticsearch 8.x
+- **Purpose**: Powers hybrid search (semantic + keyword) for injury knowledge base
+- **Authentication**: API key authentication
+- **Setup**:
+  1. Create account at https://cloud.elastic.co/registration
+  2. Create a deployment
+  3. Copy the Cloud ID/Endpoint URL (format: https://xxx.region.cloud.es.io:443)
+  4. Generate API key from deployment management console
+  5. Add endpoint and API key to environment variables
+
+### ☁️ Render
+**Hosting Platform** - Cloud platform for deploying applications
+
+- **Provider**: Render (https://render.com)
+- **Tier**: Free tier (with limitations)
+- **Region**: US-Central (or your preference)
+- **Purpose**: Hosts both frontend and backend services
+- **Deployments**: 
+  - **Backend Service** (FastAPI): https://physioassist-ai.onrender.com
+  - **Frontend Service** (Streamlit): https://physioassist-ai-frontend.onrender.com
+- **Setup**:
+  1. Create account at https://render.com
+  2. Connect GitHub repository
+  3. Create two Web Services (backend + frontend)
+  4. Configure environment variables for each service
+  5. Auto-deploys on git push to `deploy` branch
+
+### 📊 Architecture Overview
+```
+User Browser
+    ↓
+Streamlit Frontend (Render)
+    ↓
+FastAPI Backend (Render)
+    ↓
+    ├─→ MongoDB Atlas (Database)
+    └─→ Elastic Cloud (Search)
+```
+
+---
+
 ## Quick Start Guide
 
 ### 🐳 Option 1: Docker Deployment (Recommended)
@@ -584,6 +648,107 @@ async def search(query: str):
 
 ---
 
+## Cloud Deployment (Render)
+
+### Prerequisites
+- GitHub account with repository
+- Render account (https://render.com)
+- MongoDB Atlas account and cluster
+- Elastic Cloud account and deployment
+
+### Backend Service Deployment
+
+**1. Create Web Service on Render:**
+- **Name**: `physioassist-ai` (or your choice)
+- **Repository**: Your GitHub repo (e.g., AhmedAshraf82/PhysioAssist-AI)
+- **Branch**: `deploy`
+- **Root Directory**: Leave blank
+- **Runtime**: Python 3
+- **Build Command**: `pip install -r requirements.txt`
+- **Start Command**: `uvicorn src.app.main:app --host 0.0.0.0 --port $PORT`
+- **Instance Type**: Free
+
+**2. Environment Variables for Backend:**
+```bash
+# OpenAI
+OPENAI_API_KEY=sk-proj-...
+
+# MongoDB Atlas
+MONGODB_CONNECTION_STRING=mongodb+srv://username:password@cluster.mongodb.net/?retryWrites=true&w=majority
+MONGODB_DATABASE_NAME=v33
+MONGODB_COLLECTION_NAME=injuries
+
+# Elastic Cloud
+ELASTIC_SEARCH_ENDPOINT=https://xxxxx.us-central1.gcp.cloud.es.io:443
+ELASTIC_SEARCH_KEY=your_api_key_here
+
+# Search Configuration
+SEARCH_SERVICE=elasticsearch
+EMBEDDING_PROVIDER=openai
+EMBEDDING_MODEL=text-embedding-3-small
+EMBEDDING_DIMENSIONS=1536
+```
+
+**3. Deploy:**
+- Render will automatically build and deploy
+- Wait ~5-10 minutes for first deployment
+- Note your backend URL: `https://physioassist-ai.onrender.com`
+
+### Frontend Service Deployment
+
+**1. Create Another Web Service:**
+- **Name**: `physioassist-ai-frontend`
+- **Repository**: Same GitHub repo
+- **Branch**: `deploy`
+- **Root Directory**: Leave blank
+- **Runtime**: Python 3
+- **Build Command**: `pip install -r requirements.txt`
+- **Start Command**: `streamlit run streamlit_app.py --server.port=$PORT --server.address=0.0.0.0`
+- **Instance Type**: Free
+
+**2. Environment Variable for Frontend:**
+```bash
+API_BASE_URL=https://physioassist-ai.onrender.com
+```
+
+**3. Deploy:**
+- Frontend will deploy automatically
+- Access at: `https://physioassist-ai-frontend.onrender.com`
+
+### Post-Deployment Setup
+
+**1. Initialize Elasticsearch Index:**
+```bash
+curl -X POST https://physioassist-ai.onrender.com/data/ingest \
+  -H "Content-Type: application/json" \
+  -d '{"index_name": "physiotherapy_injuries", "recreate_index": true}'
+```
+
+**2. Verify Services:**
+- Backend health: https://physioassist-ai.onrender.com/health
+- Backend docs: https://physioassist-ai.onrender.com/docs
+- Frontend app: https://physioassist-ai-frontend.onrender.com
+
+### Important Notes
+
+**Free Tier Limitations:**
+- Services spin down after 15 minutes of inactivity
+- First request after spin down takes 30-60 seconds (cold start)
+- 750 hours/month free (enough for 1 service 24/7)
+
+**Auto-Deploy:**
+- Push to `deploy` branch triggers automatic redeployment
+- Monitor build logs in Render dashboard
+- Deployments take ~5-10 minutes
+
+**Troubleshooting:**
+- Check Render logs for errors
+- Verify all environment variables are set
+- Ensure MongoDB Atlas network access allows Render IPs (0.0.0.0/0)
+- Confirm Elastic Cloud is accessible
+
+---
+
 ## Environment Variables
 
 ### Required
@@ -591,8 +756,12 @@ async def search(query: str):
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `OPENAI_API_KEY` | OpenAI API key | `sk-...` |
-| `MONGODB_CONNECTION_STRING` | MongoDB connection | `mongodb://...` |
-| `ELASTICSEARCH_URL` | Elasticsearch endpoint | `http://localhost:9201` |
+| `MONGODB_CONNECTION_STRING` | MongoDB connection | `mongodb+srv://...` or `mongodb://...` |
+| `MONGODB_DATABASE_NAME` | Database name | `v33` |
+| `MONGODB_COLLECTION_NAME` | Collection name | `injuries` |
+| `ELASTIC_SEARCH_ENDPOINT` | Elastic Cloud endpoint | `https://xxx.cloud.es.io:443` |
+| `ELASTIC_SEARCH_KEY` | Elastic Cloud API key | `base64_encoded_key` |
+| `API_BASE_URL` | Backend URL (frontend only) | `https://your-backend.onrender.com` |
 
 ### Optional
 
@@ -600,6 +769,7 @@ async def search(query: str):
 |----------|-------------|---------|
 | `EMBEDDING_PROVIDER` | openai or aws_bedrock | `openai` |
 | `EMBEDDING_MODEL` | Embedding model name | `text-embedding-3-small` |
+| `EMBEDDING_DIMENSIONS` | Embedding dimensions | `1536` |
 | `SEARCH_SERVICE` | elasticsearch or opensearch | `elasticsearch` |
 | `LOG_LEVEL` | Logging level | `INFO` |
 
