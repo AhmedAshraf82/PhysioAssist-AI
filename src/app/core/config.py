@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL: str = "text-embedding-3-small"  # OpenAI embedding model
     EMBEDDING_PROVIDER: str = "openai"  # 'openai' or 'bedrock'
     VECTOR_DIMENSIONS: int = 1536  # 1536 for text-embedding-3-small/ada-002, 3072 for text-embedding-3-large
+
+    # MongoDB Configuration (loaded from .env)
+    MONGODB_CONNECTION_STRING: str
+    MONGODB_DATABASE_NAME: str
+    MONGODB_COLLECTION_NAME: str = "injuries"  # Default collection name for injuries
     
     # API Keys (optional - will be loaded from .env if present)
     OPENAI_API_KEY: str | None = None

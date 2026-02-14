@@ -4,11 +4,14 @@ Orchestrates the complete flow: index creation -> data fetching -> embedding -> 
 """
 
 from typing import Dict, Any, Optional, List
+from src.app.models.injury_models import InjuryListResponse
+from src.app.services.db_handler.injury_handler import InjuryHandler
 from src.app.services.index_creation import IndexCreationService
 from src.app.services.indexer import IndexerService
 from src.app.vectorstores.sample_data import get_sample_documents
 from src.app.core.config import settings
 from src.app.utils.logger import setup_logger
+from fastapi import HTTPException
 
 logger = setup_logger(__name__)
 
@@ -63,7 +66,7 @@ class DataIngestionPipeline:
         
         # Default text fields if not provided
         if text_fields is None:
-            text_fields = ["title", "content", "tags", "body_part", "injury_name"]
+            text_fields = ["title", "content", "tags"]
         
         logger.info("="*80)
         logger.info("Starting Data Ingestion Pipeline")
@@ -127,9 +130,20 @@ class DataIngestionPipeline:
             # Step 2: Fetch documents
             logger.info("\n--- STEP 2: Data Fetching ---")
             # TODO: Replace with MongoDB data fetching
-            # from src.app.services.db_handler.mongodb import get_documents_from_mongodb
-            # documents = get_documents_from_mongodb()
-            documents = get_sample_documents()
+            try:
+                with InjuryHandler() as handler:
+                    injuries = handler.get_all_injuries()
+                logger.info(f"Retrieved {len(injuries)} injuries from mongoDB")
+                
+                
+            except Exception as e:
+                logger.error(f"Failed to retrieve injuries: {e}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to retrieve injuries: {str(e)}"
+                )
+            # documents = get_sample_documents()
+            documents = injuries
             results["documents_fetched"] = len(documents)
             logger.info(f"✓ Fetched {len(documents)} documents from data source")
             logger.warning("⚠️  TODO: Replace get_sample_documents() with MongoDB fetching")

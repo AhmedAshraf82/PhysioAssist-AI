@@ -6,7 +6,7 @@ Provides hybrid search functionality using RAG service.
 from fastapi import APIRouter, HTTPException
 from typing import Dict, Any
 from src.app.services.rag_service import RAGService
-from src.app.models.ingestion_models import SearchRequest, SearchResponse, SearchResult
+from src.app.models.search_models import SearchRequest, SearchResponse, SearchResult
 from src.app.core.config import settings
 from src.app.utils.logger import setup_logger
 

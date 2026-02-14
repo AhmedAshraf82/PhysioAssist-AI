@@ -3,9 +3,7 @@ from fastapi import FastAPI
 import uvicorn
 from dotenv import load_dotenv
 
-from src.app.routers.chat import prediagnose
-from src.app.routers.data import ingestion
-from src.app.routers import search
+from src.app.routers import prediagnose, ingestion, search, injuries
 
 load_dotenv()
 
@@ -19,6 +17,7 @@ app = FastAPI(
 app.include_router(prediagnose.router)
 app.include_router(ingestion.router)
 app.include_router(search.router)
+app.include_router(injuries.router)
 
 
 @app.get("/", tags=["Root"])
