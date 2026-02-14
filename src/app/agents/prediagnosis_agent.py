@@ -1,6 +1,6 @@
 from autogen_agentchat.agents import AssistantAgent
 from src.app.services.llm_factory.llm_factory import LLMFactory
-
+from src.app.tools.rag_tool import rag_search_tool
 
 class PrediagnosisAgent:
     """Factory class for creating prediagnosis agents."""
@@ -36,6 +36,7 @@ class PrediagnosisAgent:
             name=name,
             model_client=model_client,
             system_message=system_message,
+            tools=[rag_search_tool]  # Add any specific tools if needed
         )
         
         return agent
