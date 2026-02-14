@@ -18,7 +18,6 @@ class Settings(BaseSettings):
     
     # Project Paths
     ROOT_DIR: Path = Path(__file__).parent.parent.parent.parent
-    USER_CHATS_DIR: Path = ROOT_DIR / "user_chats"
     
     # RAG Search Configuration
     INDEX_NAME: str = "physio_info"
