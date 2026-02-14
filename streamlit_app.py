@@ -75,7 +75,7 @@ if "search_results" not in st.session_state:
 def load_chat_history(chat_id: str) -> List[Dict[str, Any]]:
     """Load chat history from API."""
     try:
-        response = requests.get(f"{API_BASE_URL}/prediagnose/{chat_id}/history", timeout=5)
+        response = requests.get(f"{API_BASE_URL}/prediagnose/{chat_id}/history", timeout=90)
         if response.status_code == 200:
             data = response.json()
             return data.get("history", [])
@@ -152,7 +152,7 @@ def trigger_ingestion(recreate_index: bool = False) -> Dict[str, Any]:
 def list_sessions() -> List[Dict[str, Any]]:
     """List all chat sessions."""
     try:
-        response = requests.get(f"{API_BASE_URL}/prediagnose/sessions", timeout=5)
+        response = requests.get(f"{API_BASE_URL}/prediagnose/sessions", timeout=90)
         if response.status_code == 200:
             data = response.json()
             return data.get("sessions", [])
@@ -171,7 +171,7 @@ def list_sessions() -> List[Dict[str, Any]]:
 def check_api_health() -> bool:
     """Check if API server is running."""
     try:
-        response = requests.get(f"{API_BASE_URL}/health", timeout=2)
+        response = requests.get(f"{API_BASE_URL}/health", timeout=90)
         return response.status_code == 200
     except:
         return False
