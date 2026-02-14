@@ -52,3 +52,5 @@ opensearch-py==3.1.0
 
 # MongoDB
 pymongo>=4.6.0
+
+streamlit==1.54.0
