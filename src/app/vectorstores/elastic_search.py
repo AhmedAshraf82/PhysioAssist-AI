@@ -51,28 +51,30 @@ class ElasticSearchService(BaseSearchService):
             username = os.getenv("ELASTIC_USERNAME")
         if password is None:
             password = os.getenv("ELASTIC_PASSWORD")
+        if api_key is None:
+            api_key = os.getenv("ELASTIC_SEARCH_KEY") or os.getenv("ELASTIC_API_KEY")
         if embedding_provider is None:
             embedding_provider = os.getenv("EMBEDDING_PROVIDER", settings.EMBEDDING_PROVIDER)
         if embedding_model is None:
             embedding_model = os.getenv("EMBEDDING_MODEL", settings.EMBEDDING_MODEL)
 
-        # Initialize Elasticsearch client with compatibility mode for ES 7.x
-        client_options = {
-            "headers": {"accept": "application/json", "content-type": "application/json"}
-        }
-        
-        if api_key and hosts:
-            # Using API key with endpoint URL
-            self.client = Elasticsearch(hosts=hosts, api_key=api_key, **client_options)
+        # Initialize Elasticsearch client
+        if api_key:
+            # Using API key authentication (Elastic Cloud)
+            self.client = Elasticsearch(
+                hosts=hosts,
+                api_key=api_key
+            )
         elif username and password:
+            # Using basic auth (local Elasticsearch)
             self.client = Elasticsearch(
                 "https://localhost:9200",
-                basic_auth=("elastic", "elastic"),
-                ca_certs=settings.ELASTIC_CERT_PATH,
-                **client_options
+                basic_auth=(username, password),
+                ca_certs=settings.ELASTIC_CERT_PATH
             )
         else:
-            self.client = Elasticsearch(hosts=hosts or [DEFAULT_ES_URL], **client_options)
+            # No authentication (open Elasticsearch)
+            self.client = Elasticsearch(hosts=hosts or [DEFAULT_ES_URL])
 
         # Initialize embedding provider
         self.embedder = EmbeddingFactory.create(embedding_provider, embedding_model)
