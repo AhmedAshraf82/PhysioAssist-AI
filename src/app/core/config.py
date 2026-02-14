@@ -4,6 +4,10 @@ Core configuration settings for PhysioAssist-AI
 import os
 from pydantic_settings import BaseSettings
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load .env file
+load_dotenv()
 
 
 class Settings(BaseSettings):
@@ -26,8 +30,8 @@ class Settings(BaseSettings):
     
     # Elasticsearch Configuration
     ELASTICSEARCH_HOST: str = "localhost"
-    ELASTICSEARCH_PORT: int = 9200
-    ELASTICSEARCH_SCHEME: str = "https"
+    ELASTICSEARCH_PORT: int = 9201
+    ELASTICSEARCH_SCHEME: str = "http"
     ELASTIC_CERT_PATH: str = os.path.join(ROOT_DIR, "certs/elasticsearch/elastic-cert.crt")
     
     

@@ -70,13 +70,13 @@ source .venv/bin/activate
 python -m src.app.main
 
 # Or using uvicorn directly
-uvicorn src.app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn src.app.main:app --reload --host 0.0.0.0 --port 8002
 ```
 
 The API will be available at:
-- API: http://localhost:8000
-- Interactive docs (Swagger): http://localhost:8000/docs
-- Alternative docs (ReDoc): http://localhost:8000/redoc
+- API: http://localhost:8002
+- Interactive docs (Swagger): http://localhost:8002/docs
+- Alternative docs (ReDoc): http://localhost:8002/redoc
 
 ## API Endpoints
 

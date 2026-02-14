@@ -1,0 +1,65 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
+# Tests
+.pytest_cache/
+htmlcov/
+.coverage
+*.cover
+
+# Documentation
+*.md
+docs/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Logs
+logs/
+*.log
+
+# Data (exclude large files)
+data/raw/
+data/processed/
+*.csv
+*.json
+
+# Models (exclude large model files)
+models/
+*.pkl
+*.h5
+*.pth
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Build
+build/
+dist/
+*.egg-info/

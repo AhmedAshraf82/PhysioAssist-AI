@@ -8,9 +8,10 @@ import requests
 import uuid
 from datetime import datetime
 from typing import List, Dict, Any
+import os
 
 # Configuration
-API_BASE_URL = "http://localhost:8001"
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8002")
 DEFAULT_USER_ID = "default_user"
 
 # Page config
@@ -183,7 +184,11 @@ st.markdown('<h1 class="main-header">🏥 PhysioAssist AI</h1>', unsafe_allow_ht
 api_status = check_api_health()
 if not api_status:
     st.error("🔴 **API Server is not running!** Please start the FastAPI server:")
-    st.code("uvicorn src.main:app --reload --host 0.0.0.0 --port 8001", language="bash")
+    # Check if we're in Docker (API_BASE_URL will be set to backend service)
+    if "backend" in API_BASE_URL:
+        st.code("Backend container is not responding. Check: podman logs physioassist-backend", language="bash")
+    else:
+        st.code("uvicorn src.app.main:app --reload --host 0.0.0.0 --port 8002", language="bash")
     st.stop()
 else:
     st.success("🟢 API Server Connected")

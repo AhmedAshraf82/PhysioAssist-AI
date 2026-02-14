@@ -1,0 +1,114 @@
+version: '3.8'
+
+services:
+  # MongoDB
+  mongodb:
+    image: mongo:7.0
+    container_name: physioassist-mongodb
+    restart: unless-stopped
+    ports:
+      - "27018:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: physioassist_pass
+    volumes:
+      - mongodb_data:/data/db
+      - ./data/mongo_data.json:/docker-entrypoint-initdb.d/mongo_data.json
+    networks:
+      - physioassist-network
+
+  # Elasticsearch
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: physioassist-elasticsearch
+    restart: unless-stopped
+    ports:
+      - "9201:9200"
+      - "9301:9300"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - physioassist-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: physioassist-backend
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+    environment:
+      # OpenAI
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      
+      # Embedding Settings
+      - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-openai}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-3-small}
+      - EMBEDDING_DIMENSIONS=${EMBEDDING_DIMENSIONS:-1536}
+      
+      # Search Service
+      - SEARCH_SERVICE=${SEARCH_SERVICE:-elasticsearch}
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - ELASTICSEARCH_HOST=elasticsearch
+      - ELASTICSEARCH_PORT=9200
+      - ELASTICSEARCH_SCHEME=http
+      - ELASTICSEARCH_INDEX_NAME=${ELASTICSEARCH_INDEX_NAME:-physiotherapy_injuries}
+      
+      # MongoDB
+      - MONGODB_CONNECTION_STRING=mongodb://admin:physioassist_pass@mongodb:27017/
+      - MONGODB_DATABASE_NAME=${MONGODB_DATABASE_NAME:-physioassist}
+      - MONGODB_COLLECTION_NAME=${MONGODB_COLLECTION_NAME:-injuries}
+      
+      # Optional: AWS Bedrock (if using)
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      mongodb:
+        condition: service_started
+    networks:
+      - physioassist-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8002/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Streamlit Frontend
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.streamlit
+    container_name: physioassist-frontend
+    restart: unless-stopped
+    ports:
+      - "8502:8501"
+    environment:
+      - API_BASE_URL=http://backend:8002
+    depends_on:
+      - backend
+    networks:
+      - physioassist-network
+
+volumes:
+  mongodb_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+
+networks:
+  physioassist-network:
+    driver: bridge

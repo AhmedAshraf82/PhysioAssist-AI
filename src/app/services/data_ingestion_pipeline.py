@@ -129,29 +129,26 @@ class DataIngestionPipeline:
             
             # Step 2: Fetch documents
             logger.info("\n--- STEP 2: Data Fetching ---")
-            # TODO: Replace with MongoDB data fetching
             try:
                 with InjuryHandler() as handler:
                     injuries = handler.get_all_injuries()
-                logger.info(f"Retrieved {len(injuries)} injuries from mongoDB")
-                
+                    
+                if not injuries:
+                    error_msg = "No injuries found in MongoDB. Please populate the injuries collection first."
+                    logger.error(f"✗ {error_msg}")
+                    results["errors"].append(error_msg)
+                    results["message"] = error_msg
+                    return results
+                    
+                logger.info(f"✓ Retrieved {len(injuries)} injuries from MongoDB")
+                documents = injuries
+                results["documents_fetched"] = len(documents)
                 
             except Exception as e:
-                logger.error(f"Failed to retrieve injuries: {e}")
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Failed to retrieve injuries: {str(e)}"
-                )
-            # documents = get_sample_documents()
-            documents = injuries
-            results["documents_fetched"] = len(documents)
-            logger.info(f"✓ Fetched {len(documents)} documents from data source")
-            logger.warning("⚠️  TODO: Replace get_sample_documents() with MongoDB fetching")
-            
-            if not documents:
-                results["errors"].append("No documents to index")
-                results["message"] = "No documents fetched from data source"
-                logger.warning("⚠️  No documents to index")
+                error_msg = f"Failed to retrieve injuries from MongoDB: {str(e)}"
+                logger.error(f"✗ {error_msg}")
+                results["errors"].append(error_msg)
+                results["message"] = error_msg
                 return results
             
             # Step 3: Index documents with embeddings
