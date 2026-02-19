@@ -147,4 +147,460 @@
   "tags": [
     "knee injury"
   ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825cfa"
+  },
+  "title": "Meniscus Tear",
+  "content": "Tear in knee cartilage from twisting or degeneration.\n\nIndicators:\n- Knee locking or catching\n- Swelling after activity\n- Pain with deep squatting\n\nTreatment:\nPhysical therapy, possible surgery.\n\nExercises:\nQuad sets, straight leg raises.\n\nRecovery:\n4–8 weeks (conservative), 3–6 months (post-surgery).",
+  "tags": [
+    "knee",
+    "meniscus",
+    "cartilage"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825cfb"
+  },
+  "title": "Patellofemoral Pain Syndrome",
+  "content": "Anterior knee pain from kneecap tracking issues.\n\nIndicators:\n- Pain around kneecap\n- Worse with stairs or sitting\n- Crepitus during movement\n\nTreatment:\nStrengthening and activity modification.\n\nExercises:\nVMO strengthening, hip abductor work.\n\nRecovery:\n6–12 weeks.",
+  "tags": [
+    "knee",
+    "patella",
+    "anterior pain"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825cfc"
+  },
+  "title": "Patellar Tendinitis",
+  "content": "Inflammation of patellar tendon (jumper's knee).\n\nIndicators:\n- Pain below kneecap\n- Worse with jumping or running\n- Tender to touch\n\nTreatment:\nLoad management, eccentric exercises.\n\nExercises:\nEccentric squats, decline squats.\n\nRecovery:\n6–12 weeks.",
+  "tags": [
+    "knee",
+    "tendon",
+    "jumpers knee"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825cfd"
+  },
+  "title": "IT Band Syndrome",
+  "content": "Friction of iliotibial band over lateral knee.\n\nIndicators:\n- Lateral knee pain\n- Worse with running downhill\n- Pain at 30° knee flexion\n\nTreatment:\nStretching, foam rolling, strengthening.\n\nExercises:\nHip abductor strengthening, IT band stretches.\n\nRecovery:\n4–8 weeks.",
+  "tags": [
+    "knee",
+    "it band",
+    "lateral pain"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825cfe"
+  },
+  "title": "Ankle Sprain",
+  "content": "Ligament injury from inversion or eversion.\n\nIndicators:\n- Swelling and bruising\n- Pain bearing weight\n- Instability\n\nTreatment:\nRICE, progressive loading.\n\nExercises:\nBalance training, calf raises.\n\nRecovery:\n2–6 weeks (grade I-II), 8–12 weeks (grade III).",
+  "tags": [
+    "ankle",
+    "sprain",
+    "ligament"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825cff"
+  },
+  "title": "Achilles Tendinitis",
+  "content": "Overuse inflammation of Achilles tendon.\n\nIndicators:\n- Heel pain above ankle\n- Morning stiffness\n- Pain with running or jumping\n\nTreatment:\nEccentric loading, activity modification.\n\nExercises:\nHeel drops, calf stretches.\n\nRecovery:\n6–12 weeks.",
+  "tags": [
+    "ankle",
+    "achilles",
+    "tendon"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825d00"
+  },
+  "title": "Plantar Fasciitis",
+  "content": "Inflammation of plantar fascia causing heel pain.\n\nIndicators:\n- Sharp heel pain with first steps\n- Worse in morning\n- Pain with prolonged standing\n\nTreatment:\nStretching, orthotics, night splints.\n\nExercises:\nCalf stretches, toe curls, foot rolling.\n\nRecovery:\n6–18 months.",
+  "tags": [
+    "foot",
+    "plantar fascia",
+    "heel pain"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825d01"
+  },
+  "title": "Frozen Shoulder",
+  "content": "Adhesive capsulitis causing severe shoulder stiffness.\n\nIndicators:\n- Progressive loss of motion\n- Night pain\n- Difficulty with ADLs\n\nTreatment:\nMobilization, gentle stretching, sometimes cortisone.\n\nExercises:\nPendulum exercises, wall walks.\n\nRecovery:\n12–36 months.",
+  "tags": [
+    "shoulder",
+    "adhesive capsulitis",
+    "stiffness"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825d02"
+  },
+  "title": "Tennis Elbow",
+  "content": "Lateral epicondylitis from overuse of forearm extensors.\n\nIndicators:\n- Lateral elbow pain\n- Weak grip strength\n- Pain with wrist extension\n\nTreatment:\nRest, eccentric exercises, bracing.\n\nExercises:\nWrist extension exercises, forearm stretches.\n\nRecovery:\n6–12 weeks.",
+  "tags": [
+    "elbow",
+    "tennis elbow",
+    "lateral epicondylitis"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825d03"
+  },
+  "title": "Golfer's Elbow",
+  "content": "Medial epicondylitis affecting wrist flexors.\n\nIndicators:\n- Medial elbow pain\n- Pain with gripping\n- Tenderness on inner elbow\n\nTreatment:\nActivity modification, strengthening.\n\nExercises:\nWrist flexor stretches, eccentric loading.\n\nRecovery:\n6–12 weeks.",
+  "tags": [
+    "elbow",
+    "golfers elbow",
+    "medial epicondylitis"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825d04"
+  },
+  "title": "Carpal Tunnel Syndrome",
+  "content": "Median nerve compression at wrist.\n\nIndicators:\n- Numbness in thumb, index, middle fingers\n- Night symptoms\n- Weakness in grip\n\nTreatment:\nSplinting, nerve glides, possible surgery.\n\nExercises:\nMedian nerve glides, wrist stretches.\n\nRecovery:\n6–12 weeks (conservative), 3–6 months (post-surgery).",
+  "tags": [
+    "wrist",
+    "carpal tunnel",
+    "nerve compression"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825d05"
+  },
+  "title": "Lower Back Strain",
+  "content": "Muscle or ligament strain in lumbar region.\n\nIndicators:\n- Localized lower back pain\n- Muscle spasm\n- Pain with bending or lifting\n\nTreatment:\nRest, heat, gradual return to activity.\n\nExercises:\nCore stabilization, gentle stretching.\n\nRecovery:\n2–6 weeks.",
+  "tags": [
+    "lower back",
+    "strain",
+    "lumbar"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825d06"
+  },
+  "title": "Lumbar Disc Herniation",
+  "content": "Disc bulge or rupture in lower back.\n\nIndicators:\n- Radiating leg pain (sciatica)\n- Numbness or tingling\n- Worse with sitting or coughing\n\nTreatment:\nPhysical therapy, epidural injections, surgery if severe.\n\nExercises:\nMcKenzie extensions, core work.\n\nRecovery:\n6–12 weeks (conservative), 3–6 months (post-surgery).",
+  "tags": [
+    "lower back",
+    "disc herniation",
+    "sciatica"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825d07"
+  },
+  "title": "Sciatica",
+  "content": "Sciatic nerve irritation causing leg pain.\n\nIndicators:\n- Pain radiating from back to leg\n- Burning or shooting pain\n- Numbness in leg or foot\n\nTreatment:\nNerve mobilization, posture correction.\n\nExercises:\nNerve flossing, piriformis stretches.\n\nRecovery:\n4–12 weeks.",
+  "tags": [
+    "lower back",
+    "sciatica",
+    "nerve pain"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825d08"
+  },
+  "title": "Piriformis Syndrome",
+  "content": "Piriformis muscle compressing sciatic nerve.\n\nIndicators:\n- Deep buttock pain\n- Pain with sitting\n- Radiating leg symptoms\n\nTreatment:\nStretching, manual therapy.\n\nExercises:\nPiriformis stretches, hip strengthening.\n\nRecovery:\n4–8 weeks.",
+  "tags": [
+    "hip",
+    "piriformis",
+    "nerve compression"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825d09"
+  },
+  "title": "Hip Bursitis",
+  "content": "Inflammation of bursa on lateral hip.\n\nIndicators:\n- Lateral hip pain\n- Pain lying on affected side\n- Tenderness over greater trochanter\n\nTreatment:\nActivity modification, anti-inflammatories.\n\nExercises:\nHip abductor strengthening, ITB stretches.\n\nRecovery:\n4–8 weeks.",
+  "tags": [
+    "hip",
+    "bursitis",
+    "inflammation"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825d0a"
+  },
+  "title": "Hip Labral Tear",
+  "content": "Tear in cartilage ring around hip socket.\n\nIndicators:\n- Deep groin pain\n- Clicking or locking\n- Pain with hip flexion and rotation\n\nTreatment:\nPhysical therapy, possible surgery.\n\nExercises:\nHip stabilization, controlled mobility.\n\nRecovery:\n8–12 weeks (conservative), 4–6 months (post-surgery).",
+  "tags": [
+    "hip",
+    "labrum",
+    "cartilage"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825d0b"
+  },
+  "title": "Hamstring Strain",
+  "content": "Tear or overstretching of hamstring muscles.\n\nIndicators:\n- Sudden posterior thigh pain\n- Bruising possible\n- Pain with knee flexion\n\nTreatment:\nRICE, progressive loading.\n\nExercises:\nEccentric hamstring curls, Nordic curls.\n\nRecovery:\n2–3 weeks (grade I), 4–8 weeks (grade II), 3+ months (grade III).",
+  "tags": [
+    "hamstring",
+    "strain",
+    "posterior thigh"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825d0c"
+  },
+  "title": "Groin Strain",
+  "content": "Adductor muscle injury in inner thigh.\n\nIndicators:\n- Inner thigh pain\n- Pain with kicking or direction changes\n- Tenderness along adductors\n\nTreatment:\nRest, progressive strengthening.\n\nExercises:\nAdductor squeezes, side lunges.\n\nRecovery:\n2–6 weeks.",
+  "tags": [
+    "groin",
+    "adductor",
+    "strain"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825d0d"
+  },
+  "title": "Quadriceps Strain",
+  "content": "Tear or overstretch of quadriceps muscles.\n\nIndicators:\n- Anterior thigh pain\n- Weakness extending knee\n- Visible bruising possible\n\nTreatment:\nRICE, gradual return to activity.\n\nExercises:\nIsometric quads, progressive resistance.\n\nRecovery:\n2–8 weeks depending on severity.",
+  "tags": [
+    "quadriceps",
+    "strain",
+    "anterior thigh"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825d0e"
+  },
+  "title": "Shin Splints",
+  "content": "Medial tibial stress syndrome from overuse.\n\nIndicators:\n- Pain along inner shin\n- Worse with running\n- Tender to touch\n\nTreatment:\nRest, ice, gradual return to running.\n\nExercises:\nCalf strengthening, ankle mobility.\n\nRecovery:\n3–6 weeks.",
+  "tags": [
+    "shin",
+    "overuse",
+    "running injury"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825d0f"
+  },
+  "title": "Calf Strain",
+  "content": "Tear in gastrocnemius or soleus muscles.\n\nIndicators:\n- Sudden calf pain\n- Difficulty walking on toes\n- Possible bruising\n\nTreatment:\nRICE, progressive loading.\n\nExercises:\nCalf raises, eccentric heel drops.\n\nRecovery:\n2–6 weeks.",
+  "tags": [
+    "calf",
+    "strain",
+    "gastrocnemius"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825d10"
+  },
+  "title": "Stress Fracture",
+  "content": "Overuse bone injury from repetitive loading.\n\nIndicators:\n- Localized bone pain\n- Worse with activity, better with rest\n- Point tenderness\n\nTreatment:\nRest, possible boot/crutches.\n\nExercises:\nMaintain fitness with non-impact activities.\n\nRecovery:\n6–12 weeks.",
+  "tags": [
+    "bone",
+    "stress fracture",
+    "overuse"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825d11"
+  },
+  "title": "Biceps Tendinitis",
+  "content": "Inflammation of long head of biceps tendon.\n\nIndicators:\n- Anterior shoulder pain\n- Pain with overhead activities\n- Tender biceps groove\n\nTreatment:\nRest, anti-inflammatories, PT.\n\nExercises:\nBiceps stretches, rotator cuff work.\n\nRecovery:\n4–8 weeks.",
+  "tags": [
+    "shoulder",
+    "biceps",
+    "tendinitis"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825d12"
+  },
+  "title": "Shoulder Dislocation",
+  "content": "Humeral head displaced from glenoid socket.\n\nIndicators:\n- Severe pain\n- Visible deformity\n- Loss of motion\n\nTreatment:\nReduction, immobilization, then rehab.\n\nExercises:\nGradual ROM, then strengthening.\n\nRecovery:\n3–6 months.",
+  "tags": [
+    "shoulder",
+    "dislocation",
+    "trauma"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825d13"
+  },
+  "title": "AC Joint Separation",
+  "content": "Acromioclavicular ligament injury.\n\nIndicators:\n- Pain over top of shoulder\n- Visible bump if severe\n- Pain with cross-body movements\n\nTreatment:\nSling, PT, surgery for grade III+.\n\nExercises:\nScapular stabilization, deltoid work.\n\nRecovery:\n2–6 weeks (grade I-II), 3–6 months (grade III+).",
+  "tags": [
+    "shoulder",
+    "ac joint",
+    "separation"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825d14"
+  },
+  "title": "Thoracic Outlet Syndrome",
+  "content": "Compression of nerves/vessels between neck and shoulder.\n\nIndicators:\n- Numbness in arm/hand\n- Weakness\n- Symptoms worse with arm overhead\n\nTreatment:\nPosture correction, stretching, strengthening.\n\nExercises:\nScalene stretches, pec stretches.\n\nRecovery:\n6–12 weeks.",
+  "tags": [
+    "shoulder",
+    "thoracic outlet",
+    "nerve compression"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825d15"
+  },
+  "title": "Scoliosis",
+  "content": "Lateral curvature of spine.\n\nIndicators:\n- Visible spinal curve\n- Uneven shoulders/hips\n- Back pain in some cases\n\nTreatment:\nPhysical therapy, bracing if severe, surgery in extreme cases.\n\nExercises:\nCore strengthening, asymmetric stretches.\n\nRecovery:\nChronic condition, managed long-term.",
+  "tags": [
+    "spine",
+    "scoliosis",
+    "posture"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825d16"
+  },
+  "title": "Lumbar Spinal Stenosis",
+  "content": "Narrowing of spinal canal in lower back.\n\nIndicators:\n- Leg pain with walking\n- Relief when sitting or bending forward\n- Bilateral symptoms possible\n\nTreatment:\nPhysical therapy, epidurals, surgery if severe.\n\nExercises:\nFlexion-based exercises, core work.\n\nRecovery:\nChronic condition, symptom management.",
+  "tags": [
+    "lower back",
+    "stenosis",
+    "nerve compression"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825d17"
+  },
+  "title": "Sacroiliac Joint Dysfunction",
+  "content": "Pain from SI joint inflammation or hypomobility.\n\nIndicators:\n- Lower back pain (usually one-sided)\n- Pain in buttock or groin\n- Worse with stairs or standing from sitting\n\nTreatment:\nManual therapy, stabilization exercises.\n\nExercises:\nCore and hip strengthening, SI joint mobilization.\n\nRecovery:\n4–8 weeks.",
+  "tags": [
+    "lower back",
+    "si joint",
+    "pelvis"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825d18"
+  },
+  "title": "De Quervain's Tenosynovitis",
+  "content": "Inflammation of thumb tendons at wrist.\n\nIndicators:\n- Pain at thumb side of wrist\n- Swelling\n- Positive Finkelstein test\n\nTreatment:\nSplinting, anti-inflammatories, sometimes injection.\n\nExercises:\nGentle thumb stretches after inflammation subsides.\n\nRecovery:\n4–8 weeks.",
+  "tags": [
+    "wrist",
+    "thumb",
+    "tenosynovitis"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825d19"
+  },
+  "title": "Trigger Finger",
+  "content": "Locking or catching of finger due to tendon inflammation.\n\nIndicators:\n- Finger catching or locking\n- Morning stiffness\n- Painful nodule at base of finger\n\nTreatment:\nSplinting, injections, surgery if persistent.\n\nExercises:\nGentle finger stretches.\n\nRecovery:\n4–8 weeks (conservative), 2–4 weeks (post-surgery).",
+  "tags": [
+    "hand",
+    "finger",
+    "tendon"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825d1a"
+  },
+  "title": "Morton's Neuroma",
+  "content": "Nerve thickening between toes causing pain.\n\nIndicators:\n- Burning pain in ball of foot\n- Numbness in toes\n- Feels like standing on marble\n\nTreatment:\nWider shoes, orthotics, injections, surgery.\n\nExercises:\nToe stretches, foot mobilization.\n\nRecovery:\n6–12 weeks (conservative).",
+  "tags": [
+    "foot",
+    "neuroma",
+    "nerve pain"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825d1b"
+  },
+  "title": "Turf Toe",
+  "content": "Hyperextension injury to big toe joint.\n\nIndicators:\n- Pain at base of big toe\n- Swelling\n- Difficulty pushing off\n\nTreatment:\nRICE, taping, stiff-soled shoes.\n\nExercises:\nGentle ROM after acute phase.\n\nRecovery:\n2–6 weeks.",
+  "tags": [
+    "foot",
+    "toe",
+    "hyperextension"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825d1c"
+  },
+  "title": "Peroneal Tendinitis",
+  "content": "Inflammation of peroneal tendons on outside of ankle.\n\nIndicators:\n- Lateral ankle pain\n- Pain with eversion\n- Worse with activity\n\nTreatment:\nRest, ice, strengthening.\n\nExercises:\nPeroneal strengthening, balance training.\n\nRecovery:\n4–8 weeks.",
+  "tags": [
+    "ankle",
+    "peroneal",
+    "tendinitis"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825d1d"
+  },
+  "title": "Osgood-Schlatter Disease",
+  "content": "Growth plate inflammation at tibial tuberosity in adolescents.\n\nIndicators:\n- Bump below kneecap\n- Pain with running/jumping\n- Tender to touch\n\nTreatment:\nActivity modification, ice, stretching.\n\nExercises:\nQuad and hamstring stretches.\n\nRecovery:\nResolves with skeletal maturity, symptoms managed 6–24 months.",
+  "tags": [
+    "knee",
+    "adolescent",
+    "growth plate"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825d1e"
+  },
+  "title": "Sever's Disease",
+  "content": "Growth plate inflammation at heel in children.\n\nIndicators:\n- Heel pain in growing child\n- Worse with activity\n- Limping\n\nTreatment:\nRest, heel lifts, ice.\n\nExercises:\nCalf stretches.\n\nRecovery:\nResolves with skeletal maturity, 6–12 months.",
+  "tags": [
+    "heel",
+    "pediatric",
+    "growth plate"
+  ]
+},
+{
+  "_id": {
+    "$oid": "698fe0d4aeef6ff10f825d1f"
+  },
+  "title": "Bursitis (General)",
+  "content": "Inflammation of fluid-filled sac cushioning joints.\n\nIndicators:\n- Localized swelling\n- Pain with movement\n- Warmth and redness possible\n\nTreatment:\nRest, ice, anti-inflammatories, aspiration if large.\n\nExercises:\nGentle ROM after acute inflammation subsides.\n\nRecovery:\n2–6 weeks.",
+  "tags": [
+    "joint",
+    "bursitis",
+    "inflammation"
+  ]
 }]
