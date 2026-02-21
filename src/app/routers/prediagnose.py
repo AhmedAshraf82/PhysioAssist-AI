@@ -10,7 +10,11 @@ from src.app.core.config import settings
 router = APIRouter(prefix="/prediagnose", tags=["Prediagnose"])
 
 
-async def process_prediagnose_message(chat_id: str | None, message: str) -> ChatResponse:
+async def process_prediagnose_message(
+    chat_id: str | None,
+    message: str,
+    user_id: str | None = None,
+) -> ChatResponse:
     """
     Shared prediagnosis processing logic.
 
@@ -22,7 +26,7 @@ async def process_prediagnose_message(chat_id: str | None, message: str) -> Chat
     # Initialize chat session handler
     with ChatSessionHandler() as handler:
         # Add the incoming message to MongoDB
-        handler.add_message(resolved_chat_id, message, "user")
+        handler.add_message(resolved_chat_id, message, "user", user_id=user_id)
 
         # Create the prediagnosis agent
         prediagnosis_agent = PrediagnosisAgent.create_prediagnose_agent(
@@ -58,7 +62,7 @@ async def process_prediagnose_message(chat_id: str | None, message: str) -> Chat
         ai_response = task_result.messages[-1].content
 
         # Save the response to MongoDB
-        handler.add_message(resolved_chat_id, ai_response, "assistant")
+        handler.add_message(resolved_chat_id, ai_response, "assistant", user_id=user_id)
 
         # Get total message count
         message_count = handler.get_message_count(resolved_chat_id)
@@ -79,7 +83,7 @@ async def prediagnose_chat_endpoint(msg: ChatMessage):
     5. Returns the AI response with chat_id
     """
     try:
-        return await process_prediagnose_message(msg.chat_id, msg.message)
+        return await process_prediagnose_message(msg.chat_id, msg.message, msg.user_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing chat: {str(e)}")
 
@@ -164,4 +168,32 @@ async def list_prediagnose_sessions():
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error listing sessions: {str(e)}"
+        )
+
+
+@router.get("/user/{user_id}/latest")
+async def get_latest_user_session(user_id: str):
+    """
+    Retrieve the most recent chat session for a user.
+    """
+    try:
+        with ChatSessionHandler() as handler:
+            session = handler.get_latest_session(user_id)
+
+        if not session:
+            raise HTTPException(status_code=404, detail="No chat session found for user")
+
+        return {
+            "chat_id": session.get("chat_id"),
+            "user_id": session.get("user_id"),
+            "created_at": session.get("created_at"),
+            "updated_at": session.get("updated_at"),
+            "message_count": len(session.get("messages", [])),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error retrieving latest user session: {str(e)}",
         )

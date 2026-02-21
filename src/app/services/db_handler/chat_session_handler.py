@@ -62,7 +62,8 @@ class ChatSessionHandler(MongoDBHandler):
         chat_id: str,
         content: str,
         role: str,
-        mime_type: str = "TEXT"
+        mime_type: str = "TEXT",
+        user_id: Optional[str] = None,
     ) -> bool:
         """
         Add a message to an existing chat session.
@@ -87,7 +88,12 @@ class ChatSessionHandler(MongoDBHandler):
         session = self.find_one({"chat_id": chat_id})
         if not session:
             logger.info(f"Session {chat_id} doesn't exist, creating...")
-            self.create_session(chat_id)
+            self.create_session(chat_id, user_id=user_id)
+        elif user_id and not session.get("user_id"):
+            self.collection.update_one(
+                {"chat_id": chat_id},
+                {"$set": {"user_id": user_id, "updated_at": datetime.utcnow()}},
+            )
         
         # Add message to the messages array
         result = self.collection.update_one(
@@ -103,6 +109,23 @@ class ChatSessionHandler(MongoDBHandler):
             logger.debug(f"Added {role} message to session {chat_id}")
         
         return success
+
+    def get_latest_session(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get the most recently updated session for a specific user.
+
+        Args:
+            user_id: User identifier
+
+        Returns:
+            Dict or None: Latest session data excluding _id
+        """
+        session = self.collection.find_one(
+            {"user_id": user_id},
+            {"_id": 0},
+            sort=[("updated_at", -1)],
+        )
+        return session
     
     def get_session(self, chat_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -185,12 +208,6 @@ class ChatSessionHandler(MongoDBHandler):
             },
             limit=limit
         )
-        
-        # Add message count to each session
-        for session in sessions:
-            session["message_count"] = self.collection.count_documents(
-                {"chat_id": session["chat_id"]}
-            )
         
         logger.info(f"Listed {len(sessions)} sessions")
         return sessions

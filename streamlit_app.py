@@ -70,6 +70,25 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 if "search_results" not in st.session_state:
     st.session_state.search_results = []
+if "user_id" not in st.session_state:
+    st.session_state.user_id = None
+
+
+def get_or_create_user_id() -> str:
+    """Get a stable browser user_id using query params fallback."""
+    if st.session_state.user_id:
+        return st.session_state.user_id
+
+    qp = st.query_params
+    qp_user_id = qp.get("uid")
+    if qp_user_id:
+        st.session_state.user_id = str(qp_user_id)
+        return st.session_state.user_id
+
+    generated = f"web_{uuid.uuid4()}"
+    st.session_state.user_id = generated
+    st.query_params["uid"] = generated
+    return generated
 
 
 def load_chat_history(chat_id: str) -> List[Dict[str, Any]]:
@@ -88,12 +107,14 @@ def load_chat_history(chat_id: str) -> List[Dict[str, Any]]:
         return []
 
 
-def send_message(message: str, chat_id: str = None) -> Dict[str, Any]:
+def send_message(message: str, chat_id: str = None, user_id: str = None) -> Dict[str, Any]:
     """Send message to prediagnose endpoint."""
     try:
         payload = {"message": message}
         if chat_id:
             payload["chat_id"] = chat_id
+        if user_id:
+            payload["user_id"] = user_id
         
         response = requests.post(
             f"{API_BASE_URL}/prediagnose",
@@ -177,8 +198,25 @@ def check_api_health() -> bool:
         return False
 
 
+def get_latest_user_session(user_id: str) -> Dict[str, Any] | None:
+    """Get latest session for a user from API."""
+    try:
+        response = requests.get(
+            f"{API_BASE_URL}/prediagnose/user/{user_id}/latest",
+            timeout=30,
+        )
+        if response.status_code == 200:
+            return response.json()
+        return None
+    except Exception:
+        return None
+
+
 # Header
 st.markdown('<h1 class="main-header">🏥 PhysioAssist AI</h1>', unsafe_allow_html=True)
+
+# Ensure stable user id
+get_or_create_user_id()
 
 # Check API health
 api_status = check_api_health()
@@ -192,6 +230,13 @@ if not api_status:
     st.stop()
 else:
     st.success("🟢 API Server Connected")
+
+# Restore latest session on first app load/reopen for this user
+if not st.session_state.chat_id:
+    latest_session = get_latest_user_session(st.session_state.user_id)
+    if latest_session and latest_session.get("chat_id"):
+        st.session_state.chat_id = latest_session["chat_id"]
+        st.session_state.messages = load_chat_history(st.session_state.chat_id)
 
 st.markdown("---")
 
@@ -284,7 +329,11 @@ with col1:
         if submitted and user_input:
             # Send message
             with st.spinner("Thinking..."):
-                response = send_message(user_input, st.session_state.chat_id)
+                response = send_message(
+                    user_input,
+                    st.session_state.chat_id,
+                    st.session_state.user_id,
+                )
                 
                 if response:
                     # Update session

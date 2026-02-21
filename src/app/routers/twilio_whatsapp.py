@@ -39,6 +39,7 @@ async def twilio_whatsapp_webhook(
             chat_response = await process_prediagnose_message(
                 chat_id=f"twilio_{user_id}",
                 message=user_text,
+                user_id=f"twilio:{user_id}",
             )
             reply = chat_response.response
 

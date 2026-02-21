@@ -230,6 +230,7 @@ async def handle_whatsapp_webhook(
                     chat_response = await process_prediagnose_message(
                         chat_id=f"wa_{user_wa_id}",
                         message=user_text,
+                        user_id=f"wa:{user_wa_id}",
                     )
                     await send_whatsapp_text(user_wa_id, chat_response.response)
                 except Exception as e:

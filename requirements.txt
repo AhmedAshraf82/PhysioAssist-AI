@@ -45,6 +45,7 @@ openai
 
 # Additional utilities
 python-dotenv==1.0.0
+python-multipart>=0.0.9
 
 # Search services
 elasticsearch==8.11.0
