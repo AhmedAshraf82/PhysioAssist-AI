@@ -10,6 +10,64 @@ from src.app.core.config import settings
 router = APIRouter(prefix="/prediagnose", tags=["Prediagnose"])
 
 
+async def process_prediagnose_message(chat_id: str | None, message: str) -> ChatResponse:
+    """
+    Shared prediagnosis processing logic.
+
+    This function is used by both REST and WhatsApp webhook flows.
+    """
+    # Create a new unique chat id if none provided
+    resolved_chat_id = chat_id or str(uuid.uuid4())
+
+    # Initialize chat session handler
+    with ChatSessionHandler() as handler:
+        # Add the incoming message to MongoDB
+        handler.add_message(resolved_chat_id, message, "user")
+
+        # Create the prediagnosis agent
+        prediagnosis_agent = PrediagnosisAgent.create_prediagnose_agent(
+            name="PhysioAssist"
+        )
+
+        # Build context from chat history
+        all_messages = handler.get_messages(resolved_chat_id)
+        context_messages = []
+
+        for prior_message in all_messages[:-1]:  # Exclude the current message
+            role = prior_message.get("role", "user")
+            content = prior_message.get("content", "")
+            if role == "user":
+                context_messages.append(f"User: {content}")
+            elif role == "assistant":
+                context_messages.append(f"Assistant: {content}")
+
+        # Combine context with current message
+        if context_messages:
+            full_prompt = (
+                "Previous conversation:\n"
+                + "\n".join(context_messages)
+                + f"\n\nUser: {message}"
+            )
+        else:
+            full_prompt = message
+
+        # Run the agent with the task
+        task_result = await prediagnosis_agent.run(task=full_prompt)
+
+        # Extract response
+        ai_response = task_result.messages[-1].content
+
+        # Save the response to MongoDB
+        handler.add_message(resolved_chat_id, ai_response, "assistant")
+
+        # Get total message count
+        message_count = handler.get_message_count(resolved_chat_id)
+
+    return ChatResponse(
+        chat_id=resolved_chat_id, response=ai_response, message_count=message_count
+    )
+
+
 @router.post("", response_model=ChatResponse)
 async def prediagnose_chat_endpoint(msg: ChatMessage):
     """
@@ -21,57 +79,7 @@ async def prediagnose_chat_endpoint(msg: ChatMessage):
     5. Returns the AI response with chat_id
     """
     try:
-        # Create a new unique chat id if none provided
-        chat_id = msg.chat_id or str(uuid.uuid4())
-
-        # Initialize chat session handler
-        with ChatSessionHandler() as handler:
-            # Add the incoming message to MongoDB
-            handler.add_message(chat_id, msg.message, "user")
-
-            # Create the prediagnosis agent
-            prediagnosis_agent = PrediagnosisAgent.create_prediagnose_agent(
-                name="PhysioAssist"
-            )
-
-            # Build context from chat history
-            all_messages = handler.get_messages(chat_id)
-            context_messages = []
-
-            for message in all_messages[:-1]:  # Exclude the current message
-                role = message.get("role", "user")
-                content = message.get("content", "")
-                if role == "user":
-                    context_messages.append(f"User: {content}")
-                elif role == "assistant":
-                    context_messages.append(f"Assistant: {content}")
-
-            # Combine context with current message
-            if context_messages:
-                full_prompt = (
-                    "Previous conversation:\n"
-                    + "\n".join(context_messages)
-                    + f"\n\nUser: {msg.message}"
-                )
-            else:
-                full_prompt = msg.message
-
-            # Run the agent with the task
-            task_result = await prediagnosis_agent.run(task=full_prompt)
-
-            # Extract response
-            ai_response = task_result.messages[-1].content
-
-            # Save the response to MongoDB
-            handler.add_message(chat_id, ai_response, "assistant")
-
-            # Get total message count
-            message_count = handler.get_message_count(chat_id)
-
-        return ChatResponse(
-            chat_id=chat_id, response=ai_response, message_count=message_count
-        )
-
+        return await process_prediagnose_message(msg.chat_id, msg.message)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing chat: {str(e)}")
 

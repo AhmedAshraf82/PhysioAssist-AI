@@ -58,6 +58,16 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str | None = None
     GROK_API_KEY: str | None = None
     GEMINI_API_KEY: str | None = None
+
+    # WhatsApp Cloud API Configuration
+    WHATSAPP_VERIFY_TOKEN: str | None = None
+    WHATSAPP_ACCESS_TOKEN: str | None = None
+    WHATSAPP_PHONE_NUMBER_ID: str | None = None
+    WHATSAPP_API_VERSION: str = "v22.0"
+    WHATSAPP_WEBHOOK_SECRET: str | None = None
+    WHATSAPP_ENABLE_TEMPLATE_FALLBACK: bool = True
+    WHATSAPP_FALLBACK_TEMPLATE_NAME: str | None = None
+    WHATSAPP_FALLBACK_TEMPLATE_LANG: str = "en_US"
     
     class Config:
         env_file = ".env"
