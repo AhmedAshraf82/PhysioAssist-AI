@@ -68,6 +68,11 @@ class Settings(BaseSettings):
     WHATSAPP_ENABLE_TEMPLATE_FALLBACK: bool = True
     WHATSAPP_FALLBACK_TEMPLATE_NAME: str | None = None
     WHATSAPP_FALLBACK_TEMPLATE_LANG: str = "en_US"
+
+    # Twilio WhatsApp Configuration
+    TWILIO_ACCOUNT_SID: str | None = None
+    TWILIO_AUTH_TOKEN: str | None = None
+    TWILIO_WHATSAPP_NUMBER: str | None = None
     
     class Config:
         env_file = ".env"
