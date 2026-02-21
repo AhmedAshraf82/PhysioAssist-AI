@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     VERSION: str = "0.1.0"
     API_PREFIX: str = "/api/v1"
     DEBUG: bool = False
+    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
+    CORS_ORIGIN_REGEX: str = r"https://.*\.onrender\.com"
     
     
     # Project Paths

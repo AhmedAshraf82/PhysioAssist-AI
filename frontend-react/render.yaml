@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: physioassist-ai-frontend-react
+    runtime: node
+    repo: https://github.com/AhmedAshraf82/PhysioAssist-AI
+    branch: deploy
+    rootDir: frontend-react
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://physioassist-ai.onrender.com

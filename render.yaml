@@ -1,0 +1,48 @@
+services:
+  - type: web
+    name: physioassist-ai
+    runtime: python
+    plan: free
+    repo: https://github.com/AhmedAshraf82/PhysioAssist-AI
+    branch: deploy
+    rootDir: .
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn src.app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: MONGODB_CONNECTION_STRING
+        sync: false
+      - key: MONGODB_DATABASE_NAME
+        value: v33
+      - key: MONGODB_COLLECTION_NAME
+        value: injuries
+      - key: SEARCH_SERVICE_TYPE
+        value: elasticsearch
+      - key: ELASTIC_SEARCH_ENDPOINT
+        sync: false
+      - key: ELASTIC_SEARCH_KEY
+        sync: false
+      - key: EMBEDDING_PROVIDER
+        value: openai
+      - key: EMBEDDING_MODEL
+        value: text-embedding-3-small
+      - key: VECTOR_DIMENSIONS
+        value: "1536"
+      - key: CORS_ORIGINS
+        value: http://localhost:5173,http://localhost:3000
+      - key: CORS_ORIGIN_REGEX
+        value: https://.*\.onrender\.com
+
+  - type: web
+    name: physioassist-ai-frontend-react
+    runtime: node
+    plan: free
+    repo: https://github.com/AhmedAshraf82/PhysioAssist-AI
+    branch: deploy
+    rootDir: frontend-react
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://physioassist-ai.onrender.com

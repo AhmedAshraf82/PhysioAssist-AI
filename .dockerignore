@@ -63,3 +63,7 @@ models/
 build/
 dist/
 *.egg-info/
+
+# React frontend artifacts
+frontend-react/node_modules/
+frontend-react/dist/

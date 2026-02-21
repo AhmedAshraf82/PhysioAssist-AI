@@ -210,3 +210,8 @@ __marimo__/
 
 # Application logs
 logs/
+
+# Node / React frontend
+node_modules/
+frontend-react/node_modules/
+frontend-react/dist/

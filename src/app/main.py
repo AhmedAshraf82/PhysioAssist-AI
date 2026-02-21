@@ -1,9 +1,11 @@
 # server.py
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from dotenv import load_dotenv
 
 from src.app.routers import prediagnose, ingestion, search, injuries
+from src.app.core.config import settings
 
 load_dotenv()
 
@@ -11,6 +13,17 @@ app = FastAPI(
     title="PhysioAssist AI Chatbot",
     description="Chatbot with persistent session memory using Autogen AgentChat",
     version="1.0.0",
+)
+
+allowed_origins = [origin.strip() for origin in settings.CORS_ORIGINS.split(",") if origin.strip()]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins or ["*"],
+    allow_origin_regex=settings.CORS_ORIGIN_REGEX or None,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Include routers

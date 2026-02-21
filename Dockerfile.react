@@ -1,0 +1,30 @@
+# Build stage
+FROM node:20-bullseye-slim AS build
+WORKDIR /app
+
+COPY frontend-react/package*.json ./
+RUN npm ci
+
+COPY frontend-react/index.html ./
+COPY frontend-react/vite.config.js ./
+COPY frontend-react/src ./src
+
+# Browser must call backend via host-mapped port
+ARG VITE_API_BASE_URL=http://localhost:8002
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+
+RUN npm run build
+
+# Runtime stage
+FROM node:20-bullseye-slim AS runtime
+WORKDIR /app
+
+COPY frontend-react/package*.json ./
+RUN npm ci --omit=dev
+
+COPY --from=build /app/dist ./dist
+
+ENV PORT=4173
+EXPOSE 4173
+
+CMD ["npm", "start"]

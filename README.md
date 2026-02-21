@@ -2,6 +2,18 @@
 
 An AI-powered physiotherapy assistant application built with FastAPI.
 
+## Current stack
+
+- Backend: FastAPI ([src/app/main.py](src/app/main.py))
+- Frontend: React + Vite ([frontend-react](frontend-react))
+- Databases/Search: MongoDB + Elasticsearch
+
+## Quick links
+
+- Development + deployment guide: [docs/DEV_AND_DEPLOY.md](docs/DEV_AND_DEPLOY.md)
+- Render blueprint (backend + frontend): [render.yaml](render.yaml)
+- React frontend guide: [frontend-react/README.md](frontend-react/README.md)
+
 ## Project Structure
 
 ```

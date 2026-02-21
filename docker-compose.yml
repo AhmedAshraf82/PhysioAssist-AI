@@ -74,6 +74,8 @@ services:
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
       - AWS_REGION=${AWS_REGION:-us-east-1}
+    volumes:
+      - ./src:/app/src
     depends_on:
       elasticsearch:
         condition: service_healthy
@@ -98,6 +100,22 @@ services:
       - "8502:8501"
     environment:
       - API_BASE_URL=http://backend:8002
+    depends_on:
+      - backend
+    networks:
+      - physioassist-network
+
+  # React Frontend (production-like)
+  frontend-react:
+    build:
+      context: .
+      dockerfile: Dockerfile.react
+      args:
+        VITE_API_BASE_URL: http://localhost:8002
+    container_name: physioassist-frontend-react
+    restart: unless-stopped
+    ports:
+      - "5173:4173"
     depends_on:
       - backend
     networks:
