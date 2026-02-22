@@ -135,6 +135,56 @@ def send_message(message: str, chat_id: str = None, user_id: str = None) -> Dict
         return None
 
 
+def send_multimodal_message(
+    message: str = "",
+    chat_id: str = None,
+    user_id: str = None,
+    uploaded_file=None,
+) -> Dict[str, Any]:
+    """Send text and/or media to multimodal prediagnose endpoint."""
+    try:
+        data = {}
+        if message:
+            data["message"] = message
+        if chat_id:
+            data["chat_id"] = chat_id
+        if user_id:
+            data["user_id"] = user_id
+
+        files = None
+        if uploaded_file is not None:
+            files = {
+                "file": (
+                    uploaded_file.name,
+                    uploaded_file.getvalue(),
+                    uploaded_file.type or "application/octet-stream",
+                )
+            }
+
+        response = requests.post(
+            f"{API_BASE_URL}/prediagnose/multimodal",
+            data=data,
+            files=files,
+            timeout=90,
+        )
+
+        if response.status_code == 200:
+            return response.json()
+
+        try:
+            detail = response.json().get("detail", "")
+        except Exception:
+            detail = ""
+        st.error(f"Error: {response.status_code} {detail}")
+        return None
+    except requests.exceptions.ConnectionError:
+        st.error("⚠️ Cannot connect to API server")
+        return None
+    except Exception as e:
+        st.error(f"Failed to send multimodal message: {str(e)[:100]}")
+        return None
+
+
 def search_injuries(query: str) -> List[Dict[str, Any]]:
     """Search for injuries using hybrid search."""
     try:
@@ -368,27 +418,49 @@ with col1:
         else:
             st.info("👋 Start a conversation! Ask me about injuries, symptoms, or treatments.")
     
-    # Chat input
+    # Unified Chat input (text + browse file + voice recording)
     with st.form("chat_form", clear_on_submit=True):
-        user_input = st.text_area("Your message:", placeholder="Describe your symptoms or ask a question...", height=100)
+        user_input = st.text_area(
+            "Your message:",
+            placeholder="Describe your symptoms or ask a question...",
+            height=100,
+        )
+
+        uploaded_media = st.file_uploader(
+            "Attach file (image/audio)",
+            type=["jpg", "jpeg", "png", "webp", "ogg", "mp3", "wav", "m4a"],
+            accept_multiple_files=False,
+            key="chat_media_uploader",
+            help="You can upload an image or a voice/audio file.",
+        )
+
+        recorded_audio = st.audio_input("Or record a voice note")
+
         submitted = st.form_submit_button("Send 📤", use_container_width=True)
-        
-        if submitted and user_input:
-            # Send message
-            with st.spinner("Thinking..."):
-                response = send_message(
-                    user_input,
-                    st.session_state.chat_id,
-                    st.session_state.user_id,
-                )
-                
-                if response:
-                    # Update session
-                    st.session_state.chat_id = response.get("chat_id")
-                    
-                    # Reload messages
-                    st.session_state.messages = load_chat_history(st.session_state.chat_id)
-                    st.rerun()
+
+        if submitted:
+            message_text = user_input.strip()
+
+            if uploaded_media is not None and recorded_audio is not None:
+                st.info("Both uploaded and recorded audio detected. Using the recorded voice note.")
+
+            selected_media = recorded_audio if recorded_audio is not None else uploaded_media
+
+            if not message_text and selected_media is None:
+                st.warning("Please add text, attach a file, or record a voice note.")
+            else:
+                with st.spinner("Thinking..."):
+                    response = send_multimodal_message(
+                        message=message_text,
+                        chat_id=st.session_state.chat_id,
+                        user_id=st.session_state.user_id,
+                        uploaded_file=selected_media,
+                    )
+
+                    if response:
+                        st.session_state.chat_id = response.get("chat_id")
+                        st.session_state.messages = load_chat_history(st.session_state.chat_id)
+                        st.rerun()
 
 with col2:
     st.header("🔍 Search Injuries")

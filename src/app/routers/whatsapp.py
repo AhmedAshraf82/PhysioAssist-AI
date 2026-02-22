@@ -9,6 +9,8 @@ from fastapi.responses import PlainTextResponse
 
 from src.app.core.config import settings
 from src.app.routers.prediagnose import process_prediagnose_message
+from src.app.services.channels.adapters.whatsapp_adapter import to_unified_message
+from src.app.services.channels.orchestrator import process_unified_message
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +21,13 @@ def _messages_endpoint() -> str:
     return (
         f"https://graph.facebook.com/{settings.WHATSAPP_API_VERSION}/"
         f"{settings.WHATSAPP_PHONE_NUMBER_ID}/messages"
+    )
+
+
+def _media_endpoint() -> str:
+    return (
+        f"https://graph.facebook.com/{settings.WHATSAPP_API_VERSION}/"
+        f"{settings.WHATSAPP_PHONE_NUMBER_ID}/media"
     )
 
 
@@ -35,6 +44,68 @@ async def _send_payload(payload: dict[str, Any]) -> httpx.Response:
             _messages_endpoint(),
             json=payload,
             headers=_graph_api_headers(),
+        )
+
+
+def _graph_auth_headers_only() -> dict[str, str]:
+    return {
+        "Authorization": f"Bearer {settings.WHATSAPP_ACCESS_TOKEN}",
+    }
+
+
+async def upload_whatsapp_audio(audio_bytes: bytes, mime_type: str = "audio/ogg") -> str:
+    if not settings.WHATSAPP_ACCESS_TOKEN or not settings.WHATSAPP_PHONE_NUMBER_ID:
+        raise ValueError(
+            "Missing WhatsApp config: WHATSAPP_ACCESS_TOKEN or WHATSAPP_PHONE_NUMBER_ID"
+        )
+
+    extension = (mime_type.split("/")[-1] if "/" in mime_type else "ogg").split(";")[0]
+    filename = f"reply.{extension or 'ogg'}"
+
+    files = {
+        "file": (filename, audio_bytes, mime_type),
+    }
+    data = {
+        "type": mime_type,
+        "messaging_product": "whatsapp",
+    }
+
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        response = await client.post(
+            _media_endpoint(),
+            data=data,
+            files=files,
+            headers=_graph_auth_headers_only(),
+        )
+
+    if response.status_code >= 400:
+        logger.error("Failed uploading WhatsApp audio: %s", response.text)
+        raise HTTPException(
+            status_code=502,
+            detail="Failed uploading WhatsApp audio media",
+        )
+
+    payload = response.json()
+    media_id = payload.get("id") if isinstance(payload, dict) else None
+    if not media_id:
+        raise HTTPException(status_code=502, detail="WhatsApp media upload returned no id")
+    return str(media_id)
+
+
+async def send_whatsapp_audio(to_wa_id: str, media_id: str) -> None:
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": to_wa_id,
+        "type": "audio",
+        "audio": {"id": media_id},
+    }
+
+    response = await _send_payload(payload)
+    if response.status_code >= 400:
+        logger.error("Failed sending WhatsApp audio message: %s", response.text)
+        raise HTTPException(
+            status_code=502,
+            detail="Failed sending WhatsApp audio via Graph API",
         )
 
 
@@ -118,43 +189,6 @@ async def send_whatsapp_text(to_wa_id: str, text: str) -> None:
         )
 
 
-def _extract_user_text_from_message(message: dict[str, Any]) -> str | None:
-    message_type = message.get("type")
-
-    if message_type == "text":
-        return message.get("text", {}).get("body", "").strip() or None
-
-    if message_type == "button":
-        return message.get("button", {}).get("text", "").strip() or None
-
-    if message_type == "interactive":
-        interactive = message.get("interactive", {})
-        interactive_type = interactive.get("type")
-        if interactive_type == "button_reply":
-            return (
-                interactive.get("button_reply", {}).get("title", "").strip() or None
-            )
-        if interactive_type == "list_reply":
-            return interactive.get("list_reply", {}).get("title", "").strip() or None
-
-    # Support media messages with captions where available
-    if message_type in {"image", "video", "document"}:
-        media_payload = message.get(message_type, {})
-        caption = media_payload.get("caption", "").strip()
-        if caption:
-            return caption
-
-    return None
-
-
-def _unsupported_message_reply(message_type: str | None) -> str:
-    kind = message_type or "this"
-    return (
-        f"I received a {kind} message. For now I can reply best to text messages "
-        "(or media captions). Please send your symptom/question in text."
-    )
-
-
 @router.get("", response_class=PlainTextResponse)
 async def verify_webhook(
     hub_mode: str | None = Query(default=None, alias="hub.mode"),
@@ -212,27 +246,36 @@ async def handle_whatsapp_webhook(
                 continue
 
             for message in messages:
-                user_wa_id = message.get("from")
-                message_type = message.get("type")
-                user_text = _extract_user_text_from_message(message)
+                unified = to_unified_message(message)
 
-                if not user_wa_id:
+                if not unified:
                     continue
 
                 try:
-                    if not user_text:
-                        await send_whatsapp_text(
-                            user_wa_id,
-                            _unsupported_message_reply(message_type),
-                        )
+                    outbound = await process_unified_message(
+                        incoming=unified,
+                        ai_processor=process_prediagnose_message,
+                    )
+                    recipient_wa_id = str(unified.metadata.get("whatsapp_from", "")).strip()
+                    if not recipient_wa_id:
                         continue
 
-                    chat_response = await process_prediagnose_message(
-                        chat_id=f"wa_{user_wa_id}",
-                        message=user_text,
-                        user_id=f"wa:{user_wa_id}",
-                    )
-                    await send_whatsapp_text(user_wa_id, chat_response.response)
+                    if outbound.should_send_voice and outbound.voice_audio:
+                        try:
+                            media_id = await upload_whatsapp_audio(
+                                outbound.voice_audio,
+                                outbound.voice_mime_type or "audio/ogg",
+                            )
+                            await send_whatsapp_audio(recipient_wa_id, media_id)
+                            continue
+                        except Exception as voice_error:
+                            logger.exception(
+                                "Voice reply failed, falling back to text for %s: %s",
+                                recipient_wa_id,
+                                str(voice_error),
+                            )
+
+                    await send_whatsapp_text(recipient_wa_id, outbound.text)
                 except Exception as e:
                     logger.exception("Failed to process WhatsApp message: %s", str(e))
 

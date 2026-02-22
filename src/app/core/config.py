@@ -68,6 +68,10 @@ class Settings(BaseSettings):
     WHATSAPP_ENABLE_TEMPLATE_FALLBACK: bool = True
     WHATSAPP_FALLBACK_TEMPLATE_NAME: str | None = None
     WHATSAPP_FALLBACK_TEMPLATE_LANG: str = "en_US"
+    WHATSAPP_STT_ENDPOINT: str | None = None
+    WHATSAPP_VISION_ENDPOINT: str | None = None
+    WHATSAPP_TTS_ENDPOINT: str | None = None
+    WHATSAPP_ENABLE_VOICE_REPLY: bool = False
 
     # Twilio WhatsApp Configuration
     TWILIO_ACCOUNT_SID: str | None = None

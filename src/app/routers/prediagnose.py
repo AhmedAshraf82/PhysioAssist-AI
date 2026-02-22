@@ -1,10 +1,16 @@
 import uuid
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from src.app.agents.prediagnosis_agent import PrediagnosisAgent
 from src.app.models.chat_models import ChatMessage, ChatResponse
+from src.app.models.channel_models import MessageType
 from src.app.services.db_handler.chat_session_handler import ChatSessionHandler
 from src.app.core.config import settings
+from src.app.services.channels.adapters.web_adapter import (
+    to_unified_message,
+    to_unified_multimodal_message,
+)
+from src.app.services.channels.orchestrator import process_unified_message
 
 # Create router for prediagnose endpoints
 router = APIRouter(prefix="/prediagnose", tags=["Prediagnose"])
@@ -83,9 +89,112 @@ async def prediagnose_chat_endpoint(msg: ChatMessage):
     5. Returns the AI response with chat_id
     """
     try:
-        return await process_prediagnose_message(msg.chat_id, msg.message, msg.user_id)
+        unified = to_unified_message(msg)
+        outbound = await process_unified_message(
+            incoming=unified,
+            ai_processor=process_prediagnose_message,
+        )
+
+        with ChatSessionHandler() as handler:
+            message_count = handler.get_message_count(unified.chat_id)
+
+        return ChatResponse(
+            chat_id=unified.chat_id,
+            response=outbound.text,
+            message_count=message_count,
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing chat: {str(e)}")
+
+
+@router.post("/multimodal", response_model=ChatResponse)
+async def prediagnose_multimodal_endpoint(
+    message: str = Form(default=""),
+    chat_id: str | None = Form(default=None),
+    user_id: str | None = Form(default=None),
+    file: UploadFile | None = File(default=None),
+):
+    """
+    Multimodal prediagnose endpoint for web/mobile channels.
+
+    Accepts text and/or one file. Supported file mime prefixes:
+    - image/*
+    - audio/*
+    """
+    try:
+        text = (message or "").strip() or None
+
+        media_bytes: bytes | None = None
+        mime_type: str | None = None
+        message_type = MessageType.TEXT
+
+        if file is not None:
+            media_bytes = await file.read()
+            mime_type = (file.content_type or "").strip() or None
+
+            if mime_type and mime_type.startswith("image/"):
+                message_type = MessageType.IMAGE
+            elif mime_type and mime_type.startswith("audio/"):
+                message_type = MessageType.AUDIO
+            else:
+                message_type = MessageType.UNKNOWN
+
+        if not text and media_bytes is None:
+            raise HTTPException(status_code=400, detail="Provide text and/or a file")
+
+        unified = to_unified_multimodal_message(
+            chat_id=chat_id,
+            user_id=user_id,
+            message_type=message_type,
+            text=text,
+            media_bytes=media_bytes,
+            mime_type=mime_type,
+        )
+
+        outbound = await process_unified_message(
+            incoming=unified,
+            ai_processor=process_prediagnose_message,
+        )
+
+        # Persist non-AI fallback replies (e.g., "coming soon") when agent is not invoked.
+        if message_type != MessageType.TEXT:
+            has_pipeline = (
+                message_type == MessageType.AUDIO and bool(settings.WHATSAPP_STT_ENDPOINT)
+            ) or (
+                message_type == MessageType.IMAGE and bool(settings.WHATSAPP_VISION_ENDPOINT)
+            )
+
+            if not has_pipeline:
+                with ChatSessionHandler() as handler:
+                    user_log = text or f"[{message_type.value} message]"
+                    handler.add_message(
+                        unified.chat_id,
+                        user_log,
+                        "user",
+                        user_id=unified.user_id,
+                    )
+                    handler.add_message(
+                        unified.chat_id,
+                        outbound.text,
+                        "assistant",
+                        user_id=unified.user_id,
+                    )
+
+        with ChatSessionHandler() as handler:
+            message_count = handler.get_message_count(unified.chat_id)
+
+        return ChatResponse(
+            chat_id=unified.chat_id,
+            response=outbound.text,
+            message_count=message_count,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error processing multimodal chat: {str(e)}",
+        )
 
 
 @router.get("/{chat_id}/history")
