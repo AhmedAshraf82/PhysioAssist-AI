@@ -189,6 +189,26 @@ def list_sessions() -> List[Dict[str, Any]]:
         return []
 
 
+def delete_session(chat_id: str) -> bool:
+    """Delete a single chat session."""
+    try:
+        response = requests.delete(f"{API_BASE_URL}/prediagnose/{chat_id}", timeout=30)
+        return response.status_code == 200
+    except Exception:
+        return False
+
+
+def clear_all_sessions() -> int:
+    """Delete all chat sessions and return deleted count."""
+    try:
+        response = requests.delete(f"{API_BASE_URL}/prediagnose/sessions/all", timeout=30)
+        if response.status_code == 200:
+            return int(response.json().get("deleted_count", 0))
+        return 0
+    except Exception:
+        return 0
+
+
 def check_api_health() -> bool:
     """Check if API server is running."""
     try:
@@ -269,13 +289,40 @@ with st.sidebar:
     sessions = list_sessions()
     if sessions:
         st.write(f"**Active Sessions:** {len(sessions)}")
+
+        if st.button("🗑️ Clear All Sessions", use_container_width=True, type="secondary"):
+            deleted_count = clear_all_sessions()
+            if deleted_count > 0:
+                st.success(f"Deleted {deleted_count} sessions")
+            else:
+                st.info("No sessions deleted")
+            st.session_state.chat_id = None
+            st.session_state.messages = []
+            st.rerun()
+
         for session in sessions[:5]:  # Show last 5 sessions
             chat_id = session.get("chat_id", "")
             msg_count = session.get("message_count", 0)
-            if st.button(f"📝 {chat_id[:8]}... ({msg_count} msgs)", key=chat_id, use_container_width=True):
-                st.session_state.chat_id = chat_id
-                st.session_state.messages = load_chat_history(chat_id)
-                st.rerun()
+            col_view, col_delete = st.columns([5, 1])
+            with col_view:
+                if st.button(
+                    f"📝 {chat_id[:8]}... ({msg_count} msgs)",
+                    key=f"open_{chat_id}",
+                    use_container_width=True,
+                ):
+                    st.session_state.chat_id = chat_id
+                    st.session_state.messages = load_chat_history(chat_id)
+                    st.rerun()
+            with col_delete:
+                if st.button("🗑️", key=f"del_{chat_id}", use_container_width=True):
+                    if delete_session(chat_id):
+                        if st.session_state.chat_id == chat_id:
+                            st.session_state.chat_id = None
+                            st.session_state.messages = []
+                        st.success("Session deleted")
+                    else:
+                        st.error("Failed to delete session")
+                    st.rerun()
     
     st.markdown("---")
     

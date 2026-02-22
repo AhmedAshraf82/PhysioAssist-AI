@@ -152,22 +152,47 @@ async def list_prediagnose_sessions():
     try:
         with ChatSessionHandler() as handler:
             sessions = handler.list_sessions()
-        
-        # Format response
-        session_list = []
-        for session in sessions:
-            session_list.append({
-                "chat_id": session.get("chat_id"),
-                "message_count": handler.get_message_count(session.get("chat_id")),
-                "created_at": session.get("created_at"),
-                "updated_at": session.get("updated_at")
-            })
+
+            # Format response while handler is still open
+            session_list = []
+            for session in sessions:
+                chat_id = session.get("chat_id")
+                session_list.append(
+                    {
+                        "chat_id": chat_id,
+                        "message_count": handler.get_message_count(chat_id)
+                        if chat_id
+                        else 0,
+                        "created_at": session.get("created_at"),
+                        "updated_at": session.get("updated_at"),
+                    }
+                )
 
         return {"session_count": len(session_list), "sessions": session_list}
     
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error listing sessions: {str(e)}"
+        )
+
+
+@router.delete("/sessions/all")
+async def delete_all_prediagnose_sessions():
+    """
+    Delete all prediagnose chat sessions.
+    """
+    try:
+        with ChatSessionHandler() as handler:
+            deleted_count = handler.delete_many({})
+
+        return {
+            "message": "All chat sessions deleted successfully",
+            "deleted_count": deleted_count,
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error deleting all chat sessions: {str(e)}",
         )
 
 
