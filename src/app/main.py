@@ -10,6 +10,7 @@ from src.app.routers import (
     injuries,
     whatsapp,
     twilio_whatsapp,
+    speech,
 )
 
 load_dotenv()
@@ -27,6 +28,7 @@ app.include_router(search.router)
 app.include_router(injuries.router)
 app.include_router(whatsapp.router)
 app.include_router(twilio_whatsapp.router)
+app.include_router(speech.router)
 
 
 @app.get("/", tags=["Root"])

@@ -7,6 +7,7 @@ import httpx
 from src.app.core.config import settings
 from src.app.models.channel_models import MessageType, UnifiedInboundMessage, UnifiedOutboundMessage
 from src.app.services.channels.media.whatsapp_media_service import WhatsAppMediaService
+from src.app.services.speech_to_text import SpeechToTextService
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +19,11 @@ IMAGE_DESCRIPTION_COMING_SOON_MESSAGE = "Image description support coming soon!"
 
 
 async def _transcribe_audio(media_bytes: bytes, mime_type: str | None) -> str | None:
-    # TODO(STT-1): Replace endpoint call with your production STT model/service.
-    # TODO(STT-2): Keep returned contract as plain transcript text.
-    # TODO(STT-3): If your STT needs WAV/MP3, add conversion before API/model call.
+    # Primary path: OpenAI STT service with configurable model.
+    if settings.OPENAI_API_KEY:
+        return await SpeechToTextService.transcribe_audio(media_bytes, mime_type)
+
+    # Backward-compatible fallback: external STT endpoint if configured.
     if not settings.WHATSAPP_STT_ENDPOINT:
         return None
 
@@ -102,6 +105,10 @@ def _unsupported_message_reply(message_type: MessageType) -> str:
     )
 
 
+def _has_stt_support() -> bool:
+    return bool(settings.OPENAI_API_KEY or settings.WHATSAPP_STT_ENDPOINT)
+
+
 async def process_unified_message(
     incoming: UnifiedInboundMessage,
     ai_processor: AiProcessor,
@@ -110,7 +117,7 @@ async def process_unified_message(
 
     # TODO(AUDIO-ENTRY): Main audio-input hook.
     # When STT is ready, keep this branch as the only place converting voice -> text.
-    if incoming.message_type == MessageType.AUDIO and not settings.WHATSAPP_STT_ENDPOINT:
+    if incoming.message_type == MessageType.AUDIO and not _has_stt_support():
         return UnifiedOutboundMessage(text=VOICE_NOTES_COMING_SOON_MESSAGE)
 
     # TODO(IMAGE-ENTRY): Main image-description hook.
