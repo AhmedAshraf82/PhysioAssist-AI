@@ -71,7 +71,7 @@ class Settings(BaseSettings):
     WHATSAPP_STT_ENDPOINT: str | None = None
     WHATSAPP_VISION_ENDPOINT: str | None = None
     WHATSAPP_TTS_ENDPOINT: str | None = None
-    WHATSAPP_ENABLE_VOICE_REPLY: bool = False
+    WHATSAPP_ENABLE_VOICE_REPLY: bool = True
 
     # Speech-to-Text (OpenAI)
     STT_MODEL: str = "gpt-4o-transcribe"  # gpt-4o-transcribe | gpt-4o-mini-transcribe | whisper-1
@@ -80,6 +80,11 @@ class Settings(BaseSettings):
         "Medical physiotherapy context: injuries, pain locations, symptoms, movement limits, "
         "and treatment exercises. Keep anatomical and injury terms accurate."
     )
+
+    # Text-to-Speech (OpenAI)
+    TTS_MODEL: str = "gpt-4o-mini-tts"  # gpt-4o-mini-tts | gpt-4o-tts
+    TTS_VOICE: str = "alloy"
+    TTS_AUDIO_FORMAT: str = "ogg"
 
     # Twilio WhatsApp Configuration
     TWILIO_ACCOUNT_SID: str | None = None

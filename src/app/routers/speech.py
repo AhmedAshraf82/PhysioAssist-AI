@@ -1,7 +1,9 @@
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi.responses import Response
 
 from src.app.core.config import settings
 from src.app.services.speech_to_text import SpeechToTextService
+from src.app.services.text_to_speech import TextToSpeechService
 
 router = APIRouter(prefix="/speech", tags=["Speech"])
 
@@ -12,8 +14,11 @@ async def speech_health() -> dict:
     return {
         "status": "healthy",
         "stt_ready": bool(settings.OPENAI_API_KEY),
+        "tts_ready": bool(settings.OPENAI_API_KEY),
         "default_stt_model": settings.STT_MODEL,
+        "default_tts_model": settings.TTS_MODEL,
         "supported_stt_models": sorted(SpeechToTextService.SUPPORTED_MODELS),
+        "supported_tts_models": sorted(TextToSpeechService.SUPPORTED_MODELS),
     }
 
 
@@ -62,3 +67,41 @@ async def transcribe_audio(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
+
+
+@router.post("/synthesize")
+async def synthesize_speech(
+    text: str = Form(...),
+    model: str | None = Form(default=None),
+    voice: str | None = Form(default=None),
+    audio_format: str | None = Form(default=None),
+):
+    """
+    Synthesize speech from text with OpenAI TTS.
+
+    Accepts multipart form-data:
+    - text: text to synthesize (required)
+    - model: gpt-4o-mini-tts | gpt-4o-tts (optional)
+    - voice: voice preset (optional)
+    - audio_format: ogg/mp3/wav/... (optional)
+    """
+    try:
+        content = (text or "").strip()
+        if not content:
+            raise HTTPException(status_code=400, detail="text is required")
+
+        result = await TextToSpeechService.synthesize(
+            text=content,
+            model_override=(model or None),
+            voice_override=(voice or None),
+            format_override=(audio_format or None),
+        )
+        if not result:
+            raise HTTPException(status_code=422, detail="Could not synthesize speech")
+
+        audio_bytes, mime_type = result
+        return Response(content=audio_bytes, media_type=mime_type)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Speech synthesis failed: {str(e)}")

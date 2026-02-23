@@ -8,6 +8,7 @@ from src.app.core.config import settings
 from src.app.models.channel_models import MessageType, UnifiedInboundMessage, UnifiedOutboundMessage
 from src.app.services.channels.media.whatsapp_media_service import WhatsAppMediaService
 from src.app.services.speech_to_text import SpeechToTextService
+from src.app.services.text_to_speech import TextToSpeechService
 
 logger = logging.getLogger(__name__)
 
@@ -66,8 +67,11 @@ async def _describe_image(media_bytes: bytes, mime_type: str | None) -> str | No
 
 
 async def _synthesize_voice(text: str) -> tuple[bytes, str] | None:
-    # TODO(TTS-1): Replace endpoint call with your production TTS model/service.
-    # TODO(TTS-2): Return raw audio bytes + mime_type (audio/ogg recommended for WhatsApp).
+    # Primary path: OpenAI TTS service with configurable model.
+    if settings.OPENAI_API_KEY:
+        return await TextToSpeechService.synthesize(text)
+
+    # Backward-compatible fallback: external TTS endpoint if configured.
     if not settings.WHATSAPP_TTS_ENDPOINT:
         return None
 
@@ -107,6 +111,10 @@ def _unsupported_message_reply(message_type: MessageType) -> str:
 
 def _has_stt_support() -> bool:
     return bool(settings.OPENAI_API_KEY or settings.WHATSAPP_STT_ENDPOINT)
+
+
+def _has_tts_support() -> bool:
+    return bool(settings.OPENAI_API_KEY or settings.WHATSAPP_TTS_ENDPOINT)
 
 
 async def process_unified_message(
@@ -167,7 +175,7 @@ async def process_unified_message(
     if (
         incoming.message_type == MessageType.AUDIO
         and settings.WHATSAPP_ENABLE_VOICE_REPLY
-        and settings.WHATSAPP_TTS_ENDPOINT
+        and _has_tts_support()
     ):
         try:
             tts_result = await _synthesize_voice(cleaned_response)
