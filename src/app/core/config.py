@@ -85,8 +85,8 @@ class Settings(BaseSettings):
 
     # Text-to-Speech (OpenAI)
     TTS_MODEL: str = "gpt-4o-mini-tts"  # gpt-4o-mini-tts | gpt-4o-tts
-    TTS_VOICE: TTSVoice = TTSVoice.NOVA
-    TTS_SPEED: float = 1.5
+    TTS_VOICE: TTSVoice = TTSVoice.SAGE
+    TTS_SPEED: float = 1.38
     TTS_AUDIO_FORMAT: str = "ogg"
 
     # Twilio WhatsApp Configuration

@@ -74,6 +74,7 @@ async def synthesize_speech(
     text: str = Form(...),
     model: str | None = Form(default=None),
     voice: str | None = Form(default=None),
+    speed: float | None = Form(default=None),
     audio_format: str | None = Form(default=None),
 ):
     """
@@ -83,6 +84,7 @@ async def synthesize_speech(
     - text: text to synthesize (required)
     - model: gpt-4o-mini-tts | gpt-4o-tts (optional)
     - voice: voice preset (optional)
+    - speed: playback speed (optional). If omitted, uses config default `TTS_SPEED`
     - audio_format: ogg/mp3/wav/... (optional)
     """
     try:
@@ -94,6 +96,7 @@ async def synthesize_speech(
             text=content,
             model_override=(model or None),
             voice_override=(voice or None),
+            speed_override=speed,
             format_override=(audio_format or None),
         )
         if not result:
