@@ -104,12 +104,48 @@ class TextToSpeechService:
                 response.raise_for_status()
                 audio_bytes = response.content
             except httpx.HTTPStatusError as exc:
+                response_body = exc.response.text if exc.response is not None else ""
                 logger.error(
                     "TTS Service: OpenAI HTTP error status=%s body=%s",
                     exc.response.status_code if exc.response is not None else "unknown",
-                    (exc.response.text[:500] if exc.response is not None else ""),
+                    (response_body[:500] if response_body else ""),
                 )
-                raise
+
+                # Auto-fallback for unavailable model access (common in some accounts/environments).
+                if (
+                    exc.response is not None
+                    and exc.response.status_code == 404
+                    and model != "gpt-4o-mini-tts"
+                    and (
+                        "model_not_found" in response_body
+                        or "does not exist" in response_body
+                        or "do not have access" in response_body
+                    )
+                ):
+                    logger.warning(
+                        "TTS Service: model '%s' unavailable; retrying with fallback model 'gpt-4o-mini-tts'",
+                        model,
+                    )
+                    fallback_payload = {
+                        "model": "gpt-4o-mini-tts",
+                        "voice": voice,
+                        "input": text,
+                        "format": audio_format,
+                    }
+                    retry_response = await client.post(
+                        "https://api.openai.com/v1/audio/speech",
+                        headers=headers,
+                        json=fallback_payload,
+                    )
+                    logger.info(
+                        "TTS Service: fallback OpenAI response status=%s content_type=%s",
+                        retry_response.status_code,
+                        retry_response.headers.get("content-type"),
+                    )
+                    retry_response.raise_for_status()
+                    audio_bytes = retry_response.content
+                else:
+                    raise
             except Exception:
                 logger.exception("TTS Service: unexpected exception during OpenAI TTS request")
                 raise
