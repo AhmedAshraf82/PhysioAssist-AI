@@ -240,6 +240,29 @@ async def handle_whatsapp_webhook(
         for change in entry.get("changes", []):
             value = change.get("value", {})
             messages = value.get("messages", [])
+            statuses = value.get("statuses", [])
+
+            if statuses:
+                for status in statuses:
+                    status_id = status.get("id")
+                    status_state = status.get("status")
+                    recipient = status.get("recipient_id")
+                    errors = status.get("errors")
+                    if errors:
+                        logger.error(
+                            "WhatsApp delivery status error (id=%s, recipient=%s, status=%s, errors=%s)",
+                            status_id,
+                            recipient,
+                            status_state,
+                            errors,
+                        )
+                    else:
+                        logger.info(
+                            "WhatsApp delivery status (id=%s, recipient=%s, status=%s)",
+                            status_id,
+                            recipient,
+                            status_state,
+                        )
 
             # Ignore status updates and non-message events
             if not messages:
