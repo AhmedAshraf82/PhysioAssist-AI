@@ -251,21 +251,37 @@ async def handle_whatsapp_webhook(
                 if not unified:
                     continue
 
+                logger.info(
+                    "WhatsApp webhook: inbound parsed (chat_id=%s, type=%s, media_id=%s)",
+                    unified.chat_id,
+                    unified.message_type.value,
+                    bool(unified.media_id),
+                )
+
                 try:
                     outbound = await process_unified_message(
                         incoming=unified,
                         ai_processor=process_prediagnose_message,
                     )
+                    logger.info(
+                        "WhatsApp webhook: outbound generated (chat_id=%s, should_send_voice=%s, has_voice_audio=%s)",
+                        unified.chat_id,
+                        outbound.should_send_voice,
+                        bool(outbound.voice_audio),
+                    )
                     recipient_wa_id = str(unified.metadata.get("whatsapp_from", "")).strip()
                     if not recipient_wa_id:
+                        logger.warning("WhatsApp webhook: missing recipient_wa_id for chat_id=%s", unified.chat_id)
                         continue
 
                     if outbound.should_send_voice and outbound.voice_audio:
                         try:
+                            logger.info("WhatsApp webhook: uploading voice reply for %s", recipient_wa_id)
                             media_id = await upload_whatsapp_audio(
                                 outbound.voice_audio,
                                 outbound.voice_mime_type or "audio/ogg",
                             )
+                            logger.info("WhatsApp webhook: sending audio message media_id=%s", media_id)
                             await send_whatsapp_audio(recipient_wa_id, media_id)
                             continue
                         except Exception as voice_error:
@@ -275,6 +291,7 @@ async def handle_whatsapp_webhook(
                                 str(voice_error),
                             )
 
+                    logger.info("WhatsApp webhook: sending text fallback for %s", recipient_wa_id)
                     await send_whatsapp_text(recipient_wa_id, outbound.text)
                 except Exception as e:
                     logger.exception("Failed to process WhatsApp message: %s", str(e))

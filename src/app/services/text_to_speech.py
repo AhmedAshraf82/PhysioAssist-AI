@@ -59,6 +59,7 @@ class TextToSpeechService:
         format_override: str | None = None,
     ) -> tuple[bytes, str] | None:
         if not text.strip():
+            logger.warning("TTS Service: empty text input, skipping synthesis")
             return None
         if not settings.OPENAI_API_KEY:
             logger.warning("OPENAI_API_KEY is missing; TTS cannot run")
@@ -75,21 +76,47 @@ class TextToSpeechService:
             "format": audio_format,
         }
 
+        logger.info(
+            "TTS Service: synthesize start (model=%s, voice=%s, format=%s, text_len=%s)",
+            model,
+            voice,
+            audio_format,
+            len(text),
+        )
+
         headers = {
             "Authorization": f"Bearer {settings.OPENAI_API_KEY}",
             "Content-Type": "application/json",
         }
 
         async with httpx.AsyncClient(timeout=90.0) as client:
-            response = await client.post(
-                "https://api.openai.com/v1/audio/speech",
-                headers=headers,
-                json=payload,
-            )
-            response.raise_for_status()
-            audio_bytes = response.content
+            try:
+                response = await client.post(
+                    "https://api.openai.com/v1/audio/speech",
+                    headers=headers,
+                    json=payload,
+                )
+                logger.info(
+                    "TTS Service: OpenAI response status=%s content_type=%s",
+                    response.status_code,
+                    response.headers.get("content-type"),
+                )
+                response.raise_for_status()
+                audio_bytes = response.content
+            except httpx.HTTPStatusError as exc:
+                logger.error(
+                    "TTS Service: OpenAI HTTP error status=%s body=%s",
+                    exc.response.status_code if exc.response is not None else "unknown",
+                    (exc.response.text[:500] if exc.response is not None else ""),
+                )
+                raise
+            except Exception:
+                logger.exception("TTS Service: unexpected exception during OpenAI TTS request")
+                raise
 
         if not audio_bytes:
+            logger.warning("TTS Service: OpenAI returned empty audio bytes")
             return None
 
+        logger.info("TTS Service: synthesize success (audio_bytes=%s)", len(audio_bytes))
         return audio_bytes, cls._resolve_mime(audio_format)

@@ -22,10 +22,16 @@ IMAGE_DESCRIPTION_COMING_SOON_MESSAGE = "Image description support coming soon!"
 async def _transcribe_audio(media_bytes: bytes, mime_type: str | None) -> str | None:
     # Primary path: OpenAI STT service with configurable model.
     if settings.OPENAI_API_KEY:
+        logger.info(
+            "STT: using OpenAI path (mime_type=%s, bytes=%s)",
+            mime_type,
+            len(media_bytes),
+        )
         return await SpeechToTextService.transcribe_audio(media_bytes, mime_type)
 
     # Backward-compatible fallback: external STT endpoint if configured.
     if not settings.WHATSAPP_STT_ENDPOINT:
+        logger.info("STT: skipped (no OPENAI_API_KEY and no WHATSAPP_STT_ENDPOINT)")
         return None
 
     files = {
@@ -37,11 +43,13 @@ async def _transcribe_audio(media_bytes: bytes, mime_type: str | None) -> str | 
     }
 
     async with httpx.AsyncClient(timeout=90.0) as client:
+        logger.info("STT: using fallback endpoint %s", settings.WHATSAPP_STT_ENDPOINT)
         response = await client.post(settings.WHATSAPP_STT_ENDPOINT, files=files)
         response.raise_for_status()
         payload = response.json()
 
     transcript = payload.get("text") if isinstance(payload, dict) else None
+    logger.info("STT: fallback transcript received=%s", bool(transcript))
     return transcript.strip() if isinstance(transcript, str) and transcript.strip() else None
 
 
@@ -69,13 +77,16 @@ async def _describe_image(media_bytes: bytes, mime_type: str | None) -> str | No
 async def _synthesize_voice(text: str) -> tuple[bytes, str] | None:
     # Primary path: OpenAI TTS service with configurable model.
     if settings.OPENAI_API_KEY:
+        logger.info("TTS: using OpenAI path (text_len=%s)", len(text))
         return await TextToSpeechService.synthesize(text)
 
     # Backward-compatible fallback: external TTS endpoint if configured.
     if not settings.WHATSAPP_TTS_ENDPOINT:
+        logger.info("TTS: skipped (no OPENAI_API_KEY and no WHATSAPP_TTS_ENDPOINT)")
         return None
 
     async with httpx.AsyncClient(timeout=90.0) as client:
+        logger.info("TTS: using fallback endpoint %s", settings.WHATSAPP_TTS_ENDPOINT)
         response = await client.post(settings.WHATSAPP_TTS_ENDPOINT, json={"text": text})
         response.raise_for_status()
 
@@ -91,14 +102,18 @@ async def _synthesize_voice(text: str) -> tuple[bytes, str] | None:
             return None
 
         try:
+            logger.info("TTS: fallback JSON audio_base64 received")
             return base64.b64decode(encoded), str(mime_type)
         except Exception:
+            logger.exception("TTS: failed decoding fallback base64 audio payload")
             return None
 
     raw = response.content
     if not raw:
+        logger.warning("TTS: fallback endpoint returned empty body")
         return None
     mime_type = response.headers.get("content-type") or "audio/ogg"
+    logger.info("TTS: fallback raw audio received (bytes=%s, mime_type=%s)", len(raw), mime_type)
     return raw, mime_type
 
 
@@ -122,10 +137,20 @@ async def process_unified_message(
     ai_processor: AiProcessor,
 ) -> UnifiedOutboundMessage:
     user_text = incoming.text
+    logger.info(
+        "UnifiedMessage: start chat_id=%s user_id=%s type=%s has_text=%s has_media_id=%s has_media_bytes=%s",
+        incoming.chat_id,
+        incoming.user_id,
+        incoming.message_type.value,
+        bool(user_text and user_text.strip()),
+        bool(incoming.media_id),
+        incoming.media_bytes is not None,
+    )
 
     # TODO(AUDIO-ENTRY): Main audio-input hook.
     # When STT is ready, keep this branch as the only place converting voice -> text.
     if incoming.message_type == MessageType.AUDIO and not _has_stt_support():
+        logger.warning("UnifiedMessage: audio received but STT support disabled")
         return UnifiedOutboundMessage(text=VOICE_NOTES_COMING_SOON_MESSAGE)
 
     # TODO(IMAGE-ENTRY): Main image-description hook.
@@ -135,6 +160,7 @@ async def process_unified_message(
         and not user_text
         and not settings.WHATSAPP_VISION_ENDPOINT
     ):
+        logger.warning("UnifiedMessage: image received but vision endpoint is not configured")
         return UnifiedOutboundMessage(text=IMAGE_DESCRIPTION_COMING_SOON_MESSAGE)
 
     if not user_text and (incoming.media_id or incoming.media_bytes) and incoming.message_type in {
@@ -142,24 +168,42 @@ async def process_unified_message(
         MessageType.IMAGE,
     }:
         try:
+            logger.info("UnifiedMessage: media preprocessing started (type=%s)", incoming.message_type.value)
             if incoming.media_bytes is not None:
                 media_bytes = incoming.media_bytes
                 mime_type = incoming.mime_type
+                logger.info(
+                    "UnifiedMessage: using in-request media bytes (bytes=%s, mime=%s)",
+                    len(media_bytes),
+                    mime_type,
+                )
             else:
                 media_bytes, mime_type = await WhatsAppMediaService.download_media_bytes(
                     incoming.media_id or ""
                 )
+                logger.info(
+                    "UnifiedMessage: downloaded media bytes from WhatsApp (bytes=%s, mime=%s)",
+                    len(media_bytes),
+                    mime_type,
+                )
 
             if incoming.message_type == MessageType.AUDIO:
                 user_text = await _transcribe_audio(media_bytes, mime_type or incoming.mime_type)
+                logger.info("UnifiedMessage: STT completed (has_text=%s)", bool(user_text))
             elif incoming.message_type == MessageType.IMAGE:
                 user_text = await _describe_image(media_bytes, mime_type or incoming.mime_type)
+                logger.info("UnifiedMessage: vision completed (has_text=%s)", bool(user_text))
         except Exception as exc:
             logger.exception("Failed media preprocessing for %s: %s", incoming.chat_id, str(exc))
 
     if not user_text:
+        logger.warning(
+            "UnifiedMessage: no user_text after preprocessing, returning unsupported message for type=%s",
+            incoming.message_type.value,
+        )
         return UnifiedOutboundMessage(text=_unsupported_message_reply(incoming.message_type))
 
+    logger.info("UnifiedMessage: invoking ai_processor (chat_id=%s)", incoming.chat_id)
     chat_response = await ai_processor(
         incoming.chat_id,
         user_text,
@@ -171,23 +215,43 @@ async def process_unified_message(
         response_text = "I could not generate a response right now. Please try again."
 
     cleaned_response = response_text.strip()
+    logger.info("UnifiedMessage: ai response ready (response_len=%s)", len(cleaned_response))
 
-    if (
+    should_try_tts = (
         incoming.message_type == MessageType.AUDIO
-        and settings.WHATSAPP_ENABLE_VOICE_REPLY
+        and (settings.VOICE_REPLY_ON_AUDIO_INPUT or settings.WHATSAPP_ENABLE_VOICE_REPLY)
         and _has_tts_support()
-    ):
+    )
+
+    logger.info(
+        "UnifiedMessage: TTS gate message_type_audio=%s voice_reply_on_audio_input=%s whatsapp_enable_voice_reply=%s has_tts_support=%s => should_try_tts=%s",
+        incoming.message_type == MessageType.AUDIO,
+        settings.VOICE_REPLY_ON_AUDIO_INPUT,
+        settings.WHATSAPP_ENABLE_VOICE_REPLY,
+        _has_tts_support(),
+        should_try_tts,
+    )
+
+    if should_try_tts:
         try:
+            logger.info("UnifiedMessage: calling TTS synthesis")
             tts_result = await _synthesize_voice(cleaned_response)
             if tts_result:
                 voice_audio, voice_mime_type = tts_result
+                logger.info(
+                    "UnifiedMessage: TTS success (bytes=%s, mime=%s)",
+                    len(voice_audio),
+                    voice_mime_type,
+                )
                 return UnifiedOutboundMessage(
                     text=cleaned_response,
                     should_send_voice=True,
                     voice_audio=voice_audio,
                     voice_mime_type=voice_mime_type,
                 )
+            logger.warning("UnifiedMessage: TTS returned empty result, falling back to text")
         except Exception as exc:
             logger.exception("Voice synthesis failed for %s: %s", incoming.chat_id, str(exc))
 
+    logger.info("UnifiedMessage: returning text response only")
     return UnifiedOutboundMessage(text=cleaned_response)

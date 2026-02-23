@@ -72,6 +72,7 @@ class Settings(BaseSettings):
     WHATSAPP_VISION_ENDPOINT: str | None = None
     WHATSAPP_TTS_ENDPOINT: str | None = None
     WHATSAPP_ENABLE_VOICE_REPLY: bool = True
+    VOICE_REPLY_ON_AUDIO_INPUT: bool = True
 
     # Speech-to-Text (OpenAI)
     STT_MODEL: str = "gpt-4o-transcribe"  # gpt-4o-transcribe | gpt-4o-mini-transcribe | whisper-1

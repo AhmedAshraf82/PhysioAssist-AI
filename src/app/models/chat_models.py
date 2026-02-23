@@ -25,3 +25,11 @@ class ChatResponse(BaseModel):
     chat_id: str
     response: str
     message_count: int
+
+
+class MultimodalChatResponse(ChatResponse):
+    """Response model for multimodal chat with optional audio reply payload."""
+
+    reply_type: str = "text"
+    reply_audio_base64: Optional[str] = None
+    reply_audio_mime_type: Optional[str] = None

@@ -6,6 +6,7 @@ Main chat interface with search and data ingestion capabilities.
 import streamlit as st
 import requests
 import uuid
+import base64
 from datetime import datetime
 from typing import List, Dict, Any
 import os
@@ -72,6 +73,10 @@ if "search_results" not in st.session_state:
     st.session_state.search_results = []
 if "user_id" not in st.session_state:
     st.session_state.user_id = None
+if "last_reply_audio_bytes" not in st.session_state:
+    st.session_state.last_reply_audio_bytes = None
+if "last_reply_audio_mime" not in st.session_state:
+    st.session_state.last_reply_audio_mime = None
 
 
 def get_or_create_user_id() -> str:
@@ -417,6 +422,13 @@ with col1:
                     """, unsafe_allow_html=True)
         else:
             st.info("👋 Start a conversation! Ask me about injuries, symptoms, or treatments.")
+
+    if st.session_state.last_reply_audio_bytes:
+        st.caption("Last voice reply")
+        st.audio(
+            st.session_state.last_reply_audio_bytes,
+            format=st.session_state.last_reply_audio_mime or "audio/ogg",
+        )
     
     # Unified Chat input (text + browse file + voice recording)
     with st.form("chat_form", clear_on_submit=True):
@@ -458,6 +470,24 @@ with col1:
                     )
 
                     if response:
+                        reply_audio_base64 = response.get("reply_audio_base64")
+                        reply_audio_mime_type = response.get("reply_audio_mime_type")
+
+                        if reply_audio_base64:
+                            try:
+                                st.session_state.last_reply_audio_bytes = base64.b64decode(
+                                    reply_audio_base64
+                                )
+                                st.session_state.last_reply_audio_mime = (
+                                    reply_audio_mime_type or "audio/ogg"
+                                )
+                            except Exception:
+                                st.session_state.last_reply_audio_bytes = None
+                                st.session_state.last_reply_audio_mime = None
+                        else:
+                            st.session_state.last_reply_audio_bytes = None
+                            st.session_state.last_reply_audio_mime = None
+
                         st.session_state.chat_id = response.get("chat_id")
                         st.session_state.messages = load_chat_history(st.session_state.chat_id)
                         st.rerun()

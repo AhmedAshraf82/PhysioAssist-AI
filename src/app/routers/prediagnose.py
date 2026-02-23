@@ -1,8 +1,10 @@
 import uuid
+import base64
+import logging
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from src.app.agents.prediagnosis_agent import PrediagnosisAgent
-from src.app.models.chat_models import ChatMessage, ChatResponse
+from src.app.models.chat_models import ChatMessage, ChatResponse, MultimodalChatResponse
 from src.app.models.channel_models import MessageType
 from src.app.services.db_handler.chat_session_handler import ChatSessionHandler
 from src.app.core.config import settings
@@ -11,6 +13,8 @@ from src.app.services.channels.adapters.web_adapter import (
     to_unified_multimodal_message,
 )
 from src.app.services.channels.orchestrator import process_unified_message
+
+logger = logging.getLogger(__name__)
 
 # Create router for prediagnose endpoints
 router = APIRouter(prefix="/prediagnose", tags=["Prediagnose"])
@@ -95,6 +99,14 @@ async def prediagnose_chat_endpoint(msg: ChatMessage):
             ai_processor=process_prediagnose_message,
         )
 
+        logger.info(
+            "Prediagnose chat: outbound ready (chat_id=%s, type=%s, should_send_voice=%s, has_voice_audio=%s)",
+            unified.chat_id,
+            unified.message_type.value,
+            outbound.should_send_voice,
+            bool(outbound.voice_audio),
+        )
+
         with ChatSessionHandler() as handler:
             message_count = handler.get_message_count(unified.chat_id)
 
@@ -107,7 +119,7 @@ async def prediagnose_chat_endpoint(msg: ChatMessage):
         raise HTTPException(status_code=500, detail=f"Error processing chat: {str(e)}")
 
 
-@router.post("/multimodal", response_model=ChatResponse)
+@router.post("/multimodal", response_model=MultimodalChatResponse)
 async def prediagnose_multimodal_endpoint(
     message: str = Form(default=""),
     chat_id: str | None = Form(default=None),
@@ -159,7 +171,8 @@ async def prediagnose_multimodal_endpoint(
         # Persist non-AI fallback replies (e.g., "coming soon") when agent is not invoked.
         if message_type != MessageType.TEXT:
             has_pipeline = (
-                message_type == MessageType.AUDIO and bool(settings.WHATSAPP_STT_ENDPOINT)
+                message_type == MessageType.AUDIO
+                and bool(settings.OPENAI_API_KEY or settings.WHATSAPP_STT_ENDPOINT)
             ) or (
                 message_type == MessageType.IMAGE and bool(settings.WHATSAPP_VISION_ENDPOINT)
             )
@@ -183,10 +196,29 @@ async def prediagnose_multimodal_endpoint(
         with ChatSessionHandler() as handler:
             message_count = handler.get_message_count(unified.chat_id)
 
-        return ChatResponse(
+        reply_audio_base64: str | None = None
+        reply_audio_mime_type: str | None = None
+        reply_type = "text"
+
+        if outbound.should_send_voice and outbound.voice_audio:
+            reply_audio_base64 = base64.b64encode(outbound.voice_audio).decode("utf-8")
+            reply_audio_mime_type = outbound.voice_mime_type or "audio/ogg"
+            reply_type = "audio"
+
+        logger.info(
+            "Prediagnose multimodal: response payload (chat_id=%s, reply_type=%s, has_audio_base64=%s)",
+            unified.chat_id,
+            reply_type,
+            bool(reply_audio_base64),
+        )
+
+        return MultimodalChatResponse(
             chat_id=unified.chat_id,
             response=outbound.text,
             message_count=message_count,
+            reply_type=reply_type,
+            reply_audio_base64=reply_audio_base64,
+            reply_audio_mime_type=reply_audio_mime_type,
         )
     except HTTPException:
         raise
