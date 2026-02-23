@@ -3,6 +3,7 @@ import logging
 import httpx
 
 from src.app.core.config import settings
+from src.app.models.audio_models import TTSVoice
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +15,8 @@ class TextToSpeechService:
         "gpt-4o-mini-tts",
         "gpt-4o-tts",
     }
+
+    SUPPORTED_VOICES = {voice.value for voice in TTSVoice}
 
     @classmethod
     def resolve_model(cls, model_override: str | None = None) -> str:
@@ -33,6 +36,36 @@ class TextToSpeechService:
         if fmt not in supported:
             return "ogg"
         return fmt
+
+    @classmethod
+    def _resolve_voice(cls, voice_override: str | None = None) -> str:
+        configured_voice = settings.TTS_VOICE.value if isinstance(settings.TTS_VOICE, TTSVoice) else str(settings.TTS_VOICE)
+        voice = (voice_override or configured_voice or TTSVoice.ALLOY.value).strip().lower()
+        if voice not in cls.SUPPORTED_VOICES:
+            logger.warning(
+                "Unsupported TTS voice '%s'. Falling back to 'alloy'.",
+                voice,
+            )
+            return TTSVoice.ALLOY.value
+        return voice
+
+    @staticmethod
+    def _resolve_speed(speed_override: float | None = None) -> float:
+        raw_speed = speed_override if speed_override is not None else settings.TTS_SPEED
+        try:
+            speed = float(raw_speed)
+        except (TypeError, ValueError):
+            logger.warning("Invalid TTS speed '%s'. Falling back to 1.15.", raw_speed)
+            return 1.15
+
+        # Keep a safe range for speech synthesis speed.
+        if speed < 0.5:
+            logger.warning("TTS speed %s too low. Clamping to 0.5.", speed)
+            return 0.5
+        if speed > 2.0:
+            logger.warning("TTS speed %s too high. Clamping to 2.0.", speed)
+            return 2.0
+        return speed
 
     @staticmethod
     def _resolve_mime(audio_format: str) -> str:
@@ -66,6 +99,7 @@ class TextToSpeechService:
         text: str,
         model_override: str | None = None,
         voice_override: str | None = None,
+        speed_override: float | None = None,
         format_override: str | None = None,
     ) -> tuple[bytes, str] | None:
         if not text.strip():
@@ -76,20 +110,23 @@ class TextToSpeechService:
             return None
 
         model = cls.resolve_model(model_override)
-        voice = (voice_override or settings.TTS_VOICE or "alloy").strip()
+        voice = cls._resolve_voice(voice_override)
+        speed = cls._resolve_speed(speed_override)
         audio_format = cls._resolve_format(format_override)
 
         payload = {
             "model": model,
             "voice": voice,
             "input": text,
+            "speed": speed,
             "format": audio_format,
         }
 
         logger.info(
-            "TTS Service: synthesize start (model=%s, voice=%s, format=%s, text_len=%s)",
+            "TTS Service: synthesize start (model=%s, voice=%s, speed=%s, format=%s, text_len=%s)",
             model,
             voice,
+            speed,
             audio_format,
             len(text),
         )
@@ -142,6 +179,7 @@ class TextToSpeechService:
                         "model": "gpt-4o-mini-tts",
                         "voice": voice,
                         "input": text,
+                        "speed": speed,
                         "format": audio_format,
                     }
                     retry_response = await client.post(

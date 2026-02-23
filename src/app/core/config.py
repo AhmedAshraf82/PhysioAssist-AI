@@ -5,6 +5,7 @@ import os
 from pydantic_settings import BaseSettings
 from pathlib import Path
 from dotenv import load_dotenv
+from src.app.models.audio_models import TTSVoice
 
 # Load .env file
 load_dotenv()
@@ -84,7 +85,8 @@ class Settings(BaseSettings):
 
     # Text-to-Speech (OpenAI)
     TTS_MODEL: str = "gpt-4o-mini-tts"  # gpt-4o-mini-tts | gpt-4o-tts
-    TTS_VOICE: str = "alloy"
+    TTS_VOICE: TTSVoice = TTSVoice.ASH
+    TTS_SPEED: float = 1.25
     TTS_AUDIO_FORMAT: str = "ogg"
 
     # Twilio WhatsApp Configuration
