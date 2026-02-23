@@ -50,6 +50,16 @@ class TextToSpeechService:
             return "audio/pcm"
         return "audio/ogg"
 
+    @staticmethod
+    def _resolve_mime_from_response(
+        content_type_header: str | None,
+        requested_audio_format: str,
+    ) -> str:
+        content_type = (content_type_header or "").split(";")[0].strip().lower()
+        if content_type.startswith("audio/"):
+            return content_type
+        return TextToSpeechService._resolve_mime(requested_audio_format)
+
     @classmethod
     async def synthesize(
         cls,
@@ -90,16 +100,18 @@ class TextToSpeechService:
         }
 
         async with httpx.AsyncClient(timeout=90.0) as client:
+            response_content_type: str | None = None
             try:
                 response = await client.post(
                     "https://api.openai.com/v1/audio/speech",
                     headers=headers,
                     json=payload,
                 )
+                response_content_type = response.headers.get("content-type")
                 logger.info(
                     "TTS Service: OpenAI response status=%s content_type=%s",
                     response.status_code,
-                    response.headers.get("content-type"),
+                    response_content_type,
                 )
                 response.raise_for_status()
                 audio_bytes = response.content
@@ -137,10 +149,11 @@ class TextToSpeechService:
                         headers=headers,
                         json=fallback_payload,
                     )
+                    response_content_type = retry_response.headers.get("content-type")
                     logger.info(
                         "TTS Service: fallback OpenAI response status=%s content_type=%s",
                         retry_response.status_code,
-                        retry_response.headers.get("content-type"),
+                        response_content_type,
                     )
                     retry_response.raise_for_status()
                     audio_bytes = retry_response.content
@@ -154,5 +167,14 @@ class TextToSpeechService:
             logger.warning("TTS Service: OpenAI returned empty audio bytes")
             return None
 
+        resolved_mime = cls._resolve_mime_from_response(response_content_type, audio_format)
+        if resolved_mime != cls._resolve_mime(audio_format):
+            logger.warning(
+                "TTS Service: MIME mismatch detected (requested_format=%s expected_mime=%s actual_mime=%s)",
+                audio_format,
+                cls._resolve_mime(audio_format),
+                resolved_mime,
+            )
+
         logger.info("TTS Service: synthesize success (audio_bytes=%s)", len(audio_bytes))
-        return audio_bytes, cls._resolve_mime(audio_format)
+        return audio_bytes, resolved_mime
