@@ -11,6 +11,7 @@ from src.app.core.config import settings
 from src.app.routers.prediagnose import process_prediagnose_message
 from src.app.services.channels.adapters.whatsapp_adapter import to_unified_message
 from src.app.services.channels.orchestrator import process_unified_message
+from src.app.services.db_handler.whatsapp_event_handler import WhatsAppEventHandler
 
 logger = logging.getLogger(__name__)
 
@@ -272,6 +273,21 @@ async def handle_whatsapp_webhook(
                 unified = to_unified_message(message)
 
                 if not unified:
+                    continue
+
+                inbound_message_id = str(unified.metadata.get("whatsapp_message_id", "")).strip()
+                with WhatsAppEventHandler() as event_handler:
+                    is_new_event = event_handler.register_inbound_if_new(
+                        message_id=inbound_message_id,
+                        chat_id=unified.chat_id,
+                    )
+
+                if not is_new_event:
+                    logger.info(
+                        "WhatsApp webhook: duplicate inbound skipped (chat_id=%s, message_id=%s)",
+                        unified.chat_id,
+                        inbound_message_id,
+                    )
                     continue
 
                 logger.info(
