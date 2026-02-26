@@ -64,6 +64,7 @@ class ChatSessionHandler(MongoDBHandler):
         role: str,
         mime_type: str = "TEXT",
         user_id: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> bool:
         """
         Add a message to an existing chat session.
@@ -83,6 +84,9 @@ class ChatSessionHandler(MongoDBHandler):
             "mime_type": mime_type,
             "timestamp": datetime.utcnow()
         }
+
+        if metadata:
+            message["metadata"] = metadata
         
         # Check if session exists, create if not
         session = self.find_one({"chat_id": chat_id})

@@ -4,7 +4,12 @@ import logging
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from src.app.agents.prediagnosis_agent import PrediagnosisAgent
-from src.app.models.chat_models import ChatMessage, ChatResponse, MultimodalChatResponse
+from src.app.models.chat_models import (
+    ChatMessage,
+    ChatResponse,
+    MultimodalChatResponse,
+    PrediagnoseAIResult,
+)
 from src.app.models.channel_models import MessageType
 from src.app.services.db_handler.chat_session_handler import ChatSessionHandler
 from src.app.core.config import settings
@@ -13,6 +18,10 @@ from src.app.services.channels.adapters.web_adapter import (
     to_unified_multimodal_message,
 )
 from src.app.services.channels.orchestrator import process_unified_message
+from src.app.utils.token_cost import (
+    calculate_run_cost_usd,
+    calculate_total_interaction_cost_usd,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +33,7 @@ async def process_prediagnose_message(
     chat_id: str | None,
     message: str,
     user_id: str | None = None,
-) -> ChatResponse:
+) -> PrediagnoseAIResult:
     """
     Shared prediagnosis processing logic.
 
@@ -33,21 +42,12 @@ async def process_prediagnose_message(
     # Create a new unique chat id if none provided
     resolved_chat_id = chat_id or str(uuid.uuid4())
 
-    # Initialize chat session handler
+    # Build context from chat history
     with ChatSessionHandler() as handler:
-        # Add the incoming message to MongoDB
-        handler.add_message(resolved_chat_id, message, "user", user_id=user_id)
-
-        # Create the prediagnosis agent
-        prediagnosis_agent = PrediagnosisAgent.create_prediagnose_agent(
-            name="PhysioAssist"
-        )
-
-        # Build context from chat history
         all_messages = handler.get_messages(resolved_chat_id)
         context_messages = []
 
-        for prior_message in all_messages[:-1]:  # Exclude the current message
+        for prior_message in all_messages:
             role = prior_message.get("role", "user")
             content = prior_message.get("content", "")
             if role == "user":
@@ -55,30 +55,43 @@ async def process_prediagnose_message(
             elif role == "assistant":
                 context_messages.append(f"Assistant: {content}")
 
-        # Combine context with current message
-        if context_messages:
-            full_prompt = (
-                "Previous conversation:\n"
-                + "\n".join(context_messages)
-                + f"\n\nUser: {message}"
-            )
-        else:
-            full_prompt = message
+    # Create the prediagnosis agent
+    prediagnosis_agent = PrediagnosisAgent.create_prediagnose_agent(
+        name="PhysioAssist"
+    )
 
-        # Run the agent with the task
-        task_result = await prediagnosis_agent.run(task=full_prompt)
+    # Combine context with current message
+    if context_messages:
+        full_prompt = (
+            "Previous conversation:\n"
+            + "\n".join(context_messages)
+            + f"\n\nUser: {message}"
+        )
+    else:
+        full_prompt = message
 
-        # Extract response
-        ai_response = task_result.messages[-1].content
+    # Run the agent with the task
+    task_result = await prediagnosis_agent.run(task=full_prompt)
 
-        # Save the response to MongoDB
-        handler.add_message(resolved_chat_id, ai_response, "assistant", user_id=user_id)
+    # Extract response
+    ai_response = task_result.messages[-1].content
+    user_tokens = task_result.messages[-1].models_usage.prompt_tokens
+    assistant_tokens = task_result.messages[-1].models_usage.completion_tokens
+    run_cost_usd = calculate_run_cost_usd(user_tokens, assistant_tokens)
 
-        # Get total message count
-        message_count = handler.get_message_count(resolved_chat_id)
-
-    return ChatResponse(
-        chat_id=resolved_chat_id, response=ai_response, message_count=message_count
+    logger.info(
+        "Prediagnose token usage (chat_id=%s, prompt_tokens=%s, completion_tokens=%s, run_cost_usd=%.8f)",
+        resolved_chat_id,
+        user_tokens,
+        assistant_tokens,
+        run_cost_usd,
+    )
+    
+    return PrediagnoseAIResult(
+        response=ai_response,
+        llm_prompt_tokens=user_tokens,
+        llm_completion_tokens=assistant_tokens,
+        llm_cost_usd=run_cost_usd,
     )
 
 
@@ -107,7 +120,89 @@ async def prediagnose_chat_endpoint(msg: ChatMessage):
             bool(outbound.voice_audio),
         )
 
+        llm_usage = outbound.metadata.get("llm_usage", {}) if outbound.metadata else {}
+        stt_usage = outbound.metadata.get("stt_usage", {}) if outbound.metadata else {}
+        tts_usage = outbound.metadata.get("tts_usage", {}) if outbound.metadata else {}
+
+        llm_prompt_tokens = int(llm_usage.get("prompt_tokens", 0) or 0)
+        llm_completion_tokens = int(llm_usage.get("completion_tokens", 0) or 0)
+        stt_text_input_tokens = int(stt_usage.get("text_input_tokens", 0) or 0)
+        stt_text_output_tokens = int(stt_usage.get("text_output_tokens", 0) or 0)
+        stt_audio_input_tokens = int(stt_usage.get("audio_input_tokens", 0) or 0)
+        tts_text_input_tokens = int(tts_usage.get("text_input_tokens", 0) or 0)
+        tts_audio_output_tokens = int(tts_usage.get("audio_output_tokens", 0) or 0)
+
+        total_run_cost_usd = calculate_total_interaction_cost_usd(
+            llm_prompt_tokens=llm_prompt_tokens,
+            llm_completion_tokens=llm_completion_tokens,
+            stt_text_input_tokens=stt_text_input_tokens,
+            stt_text_output_tokens=stt_text_output_tokens,
+            stt_audio_input_tokens=stt_audio_input_tokens,
+            tts_text_input_tokens=tts_text_input_tokens,
+            tts_audio_output_tokens=tts_audio_output_tokens,
+        )
+
         with ChatSessionHandler() as handler:
+            normalized_user_text = (
+                outbound.metadata.get("normalized_user_text") if outbound.metadata else None
+            ) or msg.message
+
+            handler.add_message(
+                unified.chat_id,
+                normalized_user_text,
+                "user",
+                mime_type=unified.message_type.value.upper(),
+                user_id=unified.user_id,
+                metadata={
+                    "usage": {
+                        "llm": {
+                            "prompt_tokens": llm_prompt_tokens,
+                            "completion_tokens": llm_completion_tokens,
+                        },
+                        "stt": {
+                            "text_input_tokens": stt_text_input_tokens,
+                            "text_output_tokens": stt_text_output_tokens,
+                            "audio_input_tokens": stt_audio_input_tokens,
+                        },
+                        "tts": {
+                            "text_input_tokens": tts_text_input_tokens,
+                            "audio_output_tokens": tts_audio_output_tokens,
+                        },
+                    },
+                    "costs": {
+                        "total_run_cost_usd": total_run_cost_usd,
+                    },
+                },
+            )
+
+            handler.add_message(
+                unified.chat_id,
+                outbound.text,
+                "assistant",
+                mime_type="TEXT",
+                user_id=unified.user_id,
+                metadata={
+                    "usage": {
+                        "llm": {
+                            "prompt_tokens": llm_prompt_tokens,
+                            "completion_tokens": llm_completion_tokens,
+                        },
+                        "stt": {
+                            "text_input_tokens": stt_text_input_tokens,
+                            "text_output_tokens": stt_text_output_tokens,
+                            "audio_input_tokens": stt_audio_input_tokens,
+                        },
+                        "tts": {
+                            "text_input_tokens": tts_text_input_tokens,
+                            "audio_output_tokens": tts_audio_output_tokens,
+                        },
+                    },
+                    "costs": {
+                        "total_run_cost_usd": total_run_cost_usd,
+                    },
+                },
+            )
+
             message_count = handler.get_message_count(unified.chat_id)
 
         return ChatResponse(
@@ -168,30 +263,88 @@ async def prediagnose_multimodal_endpoint(
             ai_processor=process_prediagnose_message,
         )
 
-        # Persist non-AI fallback replies (e.g., "coming soon") when agent is not invoked.
-        if message_type != MessageType.TEXT:
-            has_pipeline = (
-                message_type == MessageType.AUDIO
-                and bool(settings.OPENAI_API_KEY or settings.WHATSAPP_STT_ENDPOINT)
-            ) or (
-                message_type == MessageType.IMAGE and bool(settings.WHATSAPP_VISION_ENDPOINT)
+        llm_usage = outbound.metadata.get("llm_usage", {}) if outbound.metadata else {}
+        stt_usage = outbound.metadata.get("stt_usage", {}) if outbound.metadata else {}
+        tts_usage = outbound.metadata.get("tts_usage", {}) if outbound.metadata else {}
+
+        llm_prompt_tokens = int(llm_usage.get("prompt_tokens", 0) or 0)
+        llm_completion_tokens = int(llm_usage.get("completion_tokens", 0) or 0)
+        stt_text_input_tokens = int(stt_usage.get("text_input_tokens", 0) or 0)
+        stt_text_output_tokens = int(stt_usage.get("text_output_tokens", 0) or 0)
+        stt_audio_input_tokens = int(stt_usage.get("audio_input_tokens", 0) or 0)
+        tts_text_input_tokens = int(tts_usage.get("text_input_tokens", 0) or 0)
+        tts_audio_output_tokens = int(tts_usage.get("audio_output_tokens", 0) or 0)
+
+        total_run_cost_usd = calculate_total_interaction_cost_usd(
+            llm_prompt_tokens=llm_prompt_tokens,
+            llm_completion_tokens=llm_completion_tokens,
+            stt_text_input_tokens=stt_text_input_tokens,
+            stt_text_output_tokens=stt_text_output_tokens,
+            stt_audio_input_tokens=stt_audio_input_tokens,
+            tts_text_input_tokens=tts_text_input_tokens,
+            tts_audio_output_tokens=tts_audio_output_tokens,
+        )
+
+        with ChatSessionHandler() as handler:
+            normalized_user_text = (
+                outbound.metadata.get("normalized_user_text") if outbound.metadata else None
+            ) or text or f"[{message_type.value} message]"
+
+            handler.add_message(
+                unified.chat_id,
+                normalized_user_text,
+                "user",
+                mime_type=message_type.value.upper(),
+                user_id=unified.user_id,
+                metadata={
+                    "usage": {
+                        "llm": {
+                            "prompt_tokens": llm_prompt_tokens,
+                            "completion_tokens": llm_completion_tokens,
+                        },
+                        "stt": {
+                            "text_input_tokens": stt_text_input_tokens,
+                            "text_output_tokens": stt_text_output_tokens,
+                            "audio_input_tokens": stt_audio_input_tokens,
+                        },
+                        "tts": {
+                            "text_input_tokens": tts_text_input_tokens,
+                            "audio_output_tokens": tts_audio_output_tokens,
+                        },
+                    },
+                    "costs": {
+                        "total_run_cost_usd": total_run_cost_usd,
+                    },
+                },
             )
 
-            if not has_pipeline:
-                with ChatSessionHandler() as handler:
-                    user_log = text or f"[{message_type.value} message]"
-                    handler.add_message(
-                        unified.chat_id,
-                        user_log,
-                        "user",
-                        user_id=unified.user_id,
-                    )
-                    handler.add_message(
-                        unified.chat_id,
-                        outbound.text,
-                        "assistant",
-                        user_id=unified.user_id,
-                    )
+            handler.add_message(
+                unified.chat_id,
+                outbound.text,
+                "assistant",
+                mime_type="TEXT",
+                user_id=unified.user_id,
+                metadata={
+                    "usage": {
+                        "llm": {
+                            "prompt_tokens": llm_prompt_tokens,
+                            "completion_tokens": llm_completion_tokens,
+                        },
+                        "stt": {
+                            "text_input_tokens": stt_text_input_tokens,
+                            "text_output_tokens": stt_text_output_tokens,
+                            "audio_input_tokens": stt_audio_input_tokens,
+                        },
+                        "tts": {
+                            "text_input_tokens": tts_text_input_tokens,
+                            "audio_output_tokens": tts_audio_output_tokens,
+                        },
+                    },
+                    "costs": {
+                        "total_run_cost_usd": total_run_cost_usd,
+                    },
+                },
+            )
 
         with ChatSessionHandler() as handler:
             message_count = handler.get_message_count(unified.chat_id)

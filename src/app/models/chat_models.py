@@ -33,3 +33,12 @@ class MultimodalChatResponse(ChatResponse):
     reply_type: str = "text"
     reply_audio_base64: Optional[str] = None
     reply_audio_mime_type: Optional[str] = None
+
+
+class PrediagnoseAIResult(BaseModel):
+    """Internal model carrying prediagnosis AI output and token usage."""
+
+    response: str
+    llm_prompt_tokens: int = 0
+    llm_completion_tokens: int = 0
+    llm_cost_usd: float = 0.0

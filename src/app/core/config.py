@@ -60,6 +60,11 @@ class Settings(BaseSettings):
     GROK_API_KEY: str | None = None
     GEMINI_API_KEY: str | None = None
 
+    # LLM defaults (used when not explicitly passed to agent factory)
+    LLM_PROVIDER: str = "openai"
+    MODEL: str = "gpt-4o-mini"
+    TEMPERATURE: float = 0
+
     # WhatsApp Cloud API Configuration
     WHATSAPP_VERIFY_TOKEN: str | None = None
     WHATSAPP_ACCESS_TOKEN: str | None = None
@@ -81,12 +86,13 @@ class Settings(BaseSettings):
     STT_PROMPT: str | None = (
         "Medical physiotherapy context: injuries, pain locations, symptoms, movement limits, "
         "and treatment exercises. Keep anatomical and injury terms accurate."
+        "Egyptian Arabic or English language"
     )
 
     # Text-to-Speech (OpenAI)
     TTS_MODEL: str = "gpt-4o-mini-tts"  # gpt-4o-mini-tts | gpt-4o-tts
-    TTS_VOICE: TTSVoice = TTSVoice.SAGE
-    TTS_SPEED: float = 1.38
+    TTS_VOICE: TTSVoice = TTSVoice.ASH
+    TTS_SPEED: float = 1.45
     TTS_AUDIO_FORMAT: str = "ogg"
 
     # Twilio WhatsApp Configuration

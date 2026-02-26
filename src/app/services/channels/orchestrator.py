@@ -19,7 +19,10 @@ VOICE_NOTES_COMING_SOON_MESSAGE = "Voice notes support coming soon!"
 IMAGE_DESCRIPTION_COMING_SOON_MESSAGE = "Image description support coming soon!"
 
 
-async def _transcribe_audio(media_bytes: bytes, mime_type: str | None) -> str | None:
+async def _transcribe_audio(
+    media_bytes: bytes,
+    mime_type: str | None,
+) -> tuple[str | None, dict[str, int]]:
     # Primary path: OpenAI STT service with configurable model.
     if settings.OPENAI_API_KEY:
         logger.info(
@@ -27,12 +30,16 @@ async def _transcribe_audio(media_bytes: bytes, mime_type: str | None) -> str | 
             mime_type,
             len(media_bytes),
         )
-        return await SpeechToTextService.transcribe_audio(media_bytes, mime_type)
+        return await SpeechToTextService.transcribe_audio_with_usage(media_bytes, mime_type)
 
     # Backward-compatible fallback: external STT endpoint if configured.
     if not settings.WHATSAPP_STT_ENDPOINT:
         logger.info("STT: skipped (no OPENAI_API_KEY and no WHATSAPP_STT_ENDPOINT)")
-        return None
+        return None, {
+            "text_input_tokens": 0,
+            "text_output_tokens": 0,
+            "audio_input_tokens": 0,
+        }
 
     files = {
         "file": (
@@ -50,7 +57,14 @@ async def _transcribe_audio(media_bytes: bytes, mime_type: str | None) -> str | 
 
     transcript = payload.get("text") if isinstance(payload, dict) else None
     logger.info("STT: fallback transcript received=%s", bool(transcript))
-    return transcript.strip() if isinstance(transcript, str) and transcript.strip() else None
+    return (
+        transcript.strip() if isinstance(transcript, str) and transcript.strip() else None,
+        {
+            "text_input_tokens": 0,
+            "text_output_tokens": 0,
+            "audio_input_tokens": 0,
+        },
+    )
 
 
 async def _describe_image(media_bytes: bytes, mime_type: str | None) -> str | None:
@@ -74,16 +88,16 @@ async def _describe_image(media_bytes: bytes, mime_type: str | None) -> str | No
     return text.strip() if isinstance(text, str) and text.strip() else None
 
 
-async def _synthesize_voice(text: str) -> tuple[bytes, str] | None:
+async def _synthesize_voice(text: str) -> tuple[tuple[bytes, str] | None, dict[str, int]]:
     # Primary path: OpenAI TTS service with configurable model.
     if settings.OPENAI_API_KEY:
         logger.info("TTS: using OpenAI path (text_len=%s)", len(text))
-        return await TextToSpeechService.synthesize(text)
+        return await TextToSpeechService.synthesize_with_usage(text)
 
     # Backward-compatible fallback: external TTS endpoint if configured.
     if not settings.WHATSAPP_TTS_ENDPOINT:
         logger.info("TTS: skipped (no OPENAI_API_KEY and no WHATSAPP_TTS_ENDPOINT)")
-        return None
+        return None, {"text_input_tokens": 0, "audio_output_tokens": 0}
 
     async with httpx.AsyncClient(timeout=90.0) as client:
         logger.info("TTS: using fallback endpoint %s", settings.WHATSAPP_TTS_ENDPOINT)
@@ -99,22 +113,25 @@ async def _synthesize_voice(text: str) -> tuple[bytes, str] | None:
         encoded = payload.get("audio_base64")
         mime_type = payload.get("mime_type") or "audio/ogg"
         if not isinstance(encoded, str) or not encoded.strip():
-            return None
+            return None, {"text_input_tokens": 0, "audio_output_tokens": 0}
 
         try:
             logger.info("TTS: fallback JSON audio_base64 received")
-            return base64.b64decode(encoded), str(mime_type)
+            return (
+                (base64.b64decode(encoded), str(mime_type)),
+                {"text_input_tokens": 0, "audio_output_tokens": 0},
+            )
         except Exception:
             logger.exception("TTS: failed decoding fallback base64 audio payload")
-            return None
+            return None, {"text_input_tokens": 0, "audio_output_tokens": 0}
 
     raw = response.content
     if not raw:
         logger.warning("TTS: fallback endpoint returned empty body")
-        return None
+        return None, {"text_input_tokens": 0, "audio_output_tokens": 0}
     mime_type = response.headers.get("content-type") or "audio/ogg"
     logger.info("TTS: fallback raw audio received (bytes=%s, mime_type=%s)", len(raw), mime_type)
-    return raw, mime_type
+    return (raw, mime_type), {"text_input_tokens": 0, "audio_output_tokens": 0}
 
 
 def _unsupported_message_reply(message_type: MessageType) -> str:
@@ -137,6 +154,7 @@ async def process_unified_message(
     ai_processor: AiProcessor,
 ) -> UnifiedOutboundMessage:
     user_text = incoming.text
+    metadata: dict[str, object] = {}
     logger.info(
         "UnifiedMessage: start chat_id=%s user_id=%s type=%s has_text=%s has_media_id=%s has_media_bytes=%s",
         incoming.chat_id,
@@ -188,7 +206,8 @@ async def process_unified_message(
                 )
 
             if incoming.message_type == MessageType.AUDIO:
-                user_text = await _transcribe_audio(media_bytes, mime_type or incoming.mime_type)
+                user_text, stt_usage = await _transcribe_audio(media_bytes, mime_type or incoming.mime_type)
+                metadata["stt_usage"] = stt_usage
                 logger.info("UnifiedMessage: STT completed (has_text=%s)", bool(user_text))
             elif incoming.message_type == MessageType.IMAGE:
                 user_text = await _describe_image(media_bytes, mime_type or incoming.mime_type)
@@ -203,12 +222,23 @@ async def process_unified_message(
         )
         return UnifiedOutboundMessage(text=_unsupported_message_reply(incoming.message_type))
 
+    metadata["normalized_user_text"] = user_text
+
     logger.info("UnifiedMessage: invoking ai_processor (chat_id=%s)", incoming.chat_id)
     chat_response = await ai_processor(
         incoming.chat_id,
         user_text,
         incoming.user_id,
     )
+
+    llm_prompt_tokens = int(getattr(chat_response, "llm_prompt_tokens", 0) or 0)
+    llm_completion_tokens = int(getattr(chat_response, "llm_completion_tokens", 0) or 0)
+    llm_cost_usd = float(getattr(chat_response, "llm_cost_usd", 0.0) or 0.0)
+    metadata["llm_usage"] = {
+        "prompt_tokens": llm_prompt_tokens,
+        "completion_tokens": llm_completion_tokens,
+        "cost_usd": llm_cost_usd,
+    }
 
     response_text = getattr(chat_response, "response", "")
     if not isinstance(response_text, str) or not response_text.strip():
@@ -235,7 +265,8 @@ async def process_unified_message(
     if should_try_tts:
         try:
             logger.info("UnifiedMessage: calling TTS synthesis")
-            tts_result = await _synthesize_voice(cleaned_response)
+            tts_result, tts_usage = await _synthesize_voice(cleaned_response)
+            metadata["tts_usage"] = tts_usage
             if tts_result:
                 voice_audio, voice_mime_type = tts_result
                 logger.info(
@@ -248,10 +279,11 @@ async def process_unified_message(
                     should_send_voice=True,
                     voice_audio=voice_audio,
                     voice_mime_type=voice_mime_type,
+                    metadata=metadata,
                 )
             logger.warning("UnifiedMessage: TTS returned empty result, falling back to text")
         except Exception as exc:
             logger.exception("Voice synthesis failed for %s: %s", incoming.chat_id, str(exc))
 
     logger.info("UnifiedMessage: returning text response only")
-    return UnifiedOutboundMessage(text=cleaned_response)
+    return UnifiedOutboundMessage(text=cleaned_response, metadata=metadata)

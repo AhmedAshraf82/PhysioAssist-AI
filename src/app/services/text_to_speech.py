@@ -1,4 +1,6 @@
 import logging
+import json
+import re
 
 import httpx
 
@@ -102,12 +104,110 @@ class TextToSpeechService:
         speed_override: float | None = None,
         format_override: str | None = None,
     ) -> tuple[bytes, str] | None:
+        result, _ = await cls.synthesize_with_usage(
+            text=text,
+            model_override=model_override,
+            voice_override=voice_override,
+            speed_override=speed_override,
+            format_override=format_override,
+        )
+        return result
+
+    @staticmethod
+    def _parse_usage_header(raw_header: str | None) -> dict[str, int]:
+        if not raw_header:
+            return {"text_input_tokens": 0, "audio_output_tokens": 0}
+
+        try:
+            payload = json.loads(raw_header)
+        except Exception:
+            return {"text_input_tokens": 0, "audio_output_tokens": 0}
+
+        if not isinstance(payload, dict):
+            return {"text_input_tokens": 0, "audio_output_tokens": 0}
+
+        text_input = payload.get("text_input_tokens")
+        if not isinstance(text_input, (int, float)):
+            text_input = payload.get("input_tokens")
+
+        audio_output = payload.get("audio_output_tokens")
+        if not isinstance(audio_output, (int, float)):
+            audio_output = payload.get("output_audio_tokens")
+
+        return {
+            "text_input_tokens": int(text_input) if isinstance(text_input, (int, float)) else 0,
+            "audio_output_tokens": int(audio_output) if isinstance(audio_output, (int, float)) else 0,
+        }
+
+    @staticmethod
+    def _estimate_text_input_tokens(text: str) -> int:
+        """Estimate text tokens when provider usage metadata is unavailable."""
+        cleaned = (text or "").strip()
+        if not cleaned:
+            return 0
+
+        # Practical approximation for English-like text: ~4 chars/token.
+        return max(1, int(round(len(cleaned) / 4)))
+
+    @staticmethod
+    def _estimate_audio_output_tokens(text: str, speed: float) -> int:
+        """
+        Estimate audio tokens from spoken duration.
+
+        Heuristic:
+        - Speech rate baseline: ~150 words/min at speed=1.0
+        - Audio tokenization baseline: ~50 audio tokens/sec (20ms per token)
+        """
+        cleaned = (text or "").strip()
+        if not cleaned:
+            return 0
+
+        words = re.findall(r"\S+", cleaned)
+        word_count = len(words)
+        effective_speed = speed if speed > 0 else 1.0
+
+        # Avoid division by zero and unrealistic tiny durations.
+        words_per_minute = max(60.0, 150.0 * effective_speed)
+        duration_seconds = max(0.2, (word_count / words_per_minute) * 60.0)
+
+        return max(1, int(round(duration_seconds * 50.0)))
+
+    @classmethod
+    def _finalize_usage(
+        cls,
+        usage_data: dict[str, int],
+        text: str,
+        speed: float,
+    ) -> dict[str, int]:
+        """Fill missing usage values with estimated non-zero fallbacks."""
+        text_input_tokens = int(usage_data.get("text_input_tokens", 0) or 0)
+        audio_output_tokens = int(usage_data.get("audio_output_tokens", 0) or 0)
+
+        if text_input_tokens <= 0:
+            text_input_tokens = cls._estimate_text_input_tokens(text)
+        if audio_output_tokens <= 0:
+            audio_output_tokens = cls._estimate_audio_output_tokens(text, speed)
+
+        return {
+            "text_input_tokens": text_input_tokens,
+            "audio_output_tokens": audio_output_tokens,
+        }
+
+    @classmethod
+    async def synthesize_with_usage(
+        cls,
+        text: str,
+        model_override: str | None = None,
+        voice_override: str | None = None,
+        speed_override: float | None = None,
+        format_override: str | None = None,
+    ) -> tuple[tuple[bytes, str] | None, dict[str, int]]:
         if not text.strip():
             logger.warning("TTS Service: empty text input, skipping synthesis")
-            return None
+            return None, {"text_input_tokens": 0, "audio_output_tokens": 0}
         if not settings.OPENAI_API_KEY:
             logger.warning("OPENAI_API_KEY is missing; TTS cannot run")
-            return None
+            return None, {"text_input_tokens": 0, "audio_output_tokens": 0}
 
         model = cls.resolve_model(model_override)
         voice = cls._resolve_voice(voice_override)
@@ -138,6 +238,7 @@ class TextToSpeechService:
 
         async with httpx.AsyncClient(timeout=90.0) as client:
             response_content_type: str | None = None
+            usage_header: str | None = None
             try:
                 response = await client.post(
                     "https://api.openai.com/v1/audio/speech",
@@ -145,6 +246,7 @@ class TextToSpeechService:
                     json=payload,
                 )
                 response_content_type = response.headers.get("content-type")
+                usage_header = response.headers.get("openai-usage") or response.headers.get("x-openai-usage")
                 logger.info(
                     "TTS Service: OpenAI response status=%s content_type=%s",
                     response.status_code,
@@ -188,6 +290,7 @@ class TextToSpeechService:
                         json=fallback_payload,
                     )
                     response_content_type = retry_response.headers.get("content-type")
+                    usage_header = retry_response.headers.get("openai-usage") or retry_response.headers.get("x-openai-usage")
                     logger.info(
                         "TTS Service: fallback OpenAI response status=%s content_type=%s",
                         retry_response.status_code,
@@ -203,7 +306,7 @@ class TextToSpeechService:
 
         if not audio_bytes:
             logger.warning("TTS Service: OpenAI returned empty audio bytes")
-            return None
+            return None, {"text_input_tokens": 0, "audio_output_tokens": 0}
 
         resolved_mime = cls._resolve_mime_from_response(response_content_type, audio_format)
         if resolved_mime != cls._resolve_mime(audio_format):
@@ -215,4 +318,6 @@ class TextToSpeechService:
             )
 
         logger.info("TTS Service: synthesize success (audio_bytes=%s)", len(audio_bytes))
-        return audio_bytes, resolved_mime
+        usage_data = cls._parse_usage_header(usage_header)
+        usage_data = cls._finalize_usage(usage_data, text=text, speed=speed)
+        return (audio_bytes, resolved_mime), usage_data
