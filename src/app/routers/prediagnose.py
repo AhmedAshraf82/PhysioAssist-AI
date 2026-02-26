@@ -1,16 +1,16 @@
-import uuid
 import base64
 import logging
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
-from src.app.agents.prediagnosis_agent import PrediagnosisAgent
 from src.app.models.chat_models import (
     ChatMessage,
     ChatResponse,
     MultimodalChatResponse,
-    PrediagnoseAIResult,
 )
 from src.app.models.channel_models import MessageType
+from src.app.services.chats.prediagnose_chat_service import (
+    process_prediagnose_message,
+)
 from src.app.services.db_handler.chat_session_handler import ChatSessionHandler
 from src.app.core.config import settings
 from src.app.services.channels.adapters.web_adapter import (
@@ -19,7 +19,6 @@ from src.app.services.channels.adapters.web_adapter import (
 )
 from src.app.services.channels.orchestrator import process_unified_message
 from src.app.utils.token_cost import (
-    calculate_run_cost_usd,
     calculate_total_interaction_cost_usd,
 )
 
@@ -27,73 +26,6 @@ logger = logging.getLogger(__name__)
 
 # Create router for prediagnose endpoints
 router = APIRouter(prefix="/prediagnose", tags=["Prediagnose"])
-
-
-async def process_prediagnose_message(
-    chat_id: str | None,
-    message: str,
-    user_id: str | None = None,
-) -> PrediagnoseAIResult:
-    """
-    Shared prediagnosis processing logic.
-
-    This function is used by both REST and WhatsApp webhook flows.
-    """
-    # Create a new unique chat id if none provided
-    resolved_chat_id = chat_id or str(uuid.uuid4())
-
-    # Build context from chat history
-    with ChatSessionHandler() as handler:
-        all_messages = handler.get_messages(resolved_chat_id)
-        context_messages = []
-
-        for prior_message in all_messages:
-            role = prior_message.get("role", "user")
-            content = prior_message.get("content", "")
-            if role == "user":
-                context_messages.append(f"User: {content}")
-            elif role == "assistant":
-                context_messages.append(f"Assistant: {content}")
-
-    # Create the prediagnosis agent
-    prediagnosis_agent = PrediagnosisAgent.create_prediagnose_agent(
-        name="PhysioAssist"
-    )
-
-    # Combine context with current message
-    if context_messages:
-        full_prompt = (
-            "Previous conversation:\n"
-            + "\n".join(context_messages)
-            + f"\n\nUser: {message}"
-        )
-    else:
-        full_prompt = message
-
-    # Run the agent with the task
-    task_result = await prediagnosis_agent.run(task=full_prompt)
-
-    # Extract response
-    ai_response = task_result.messages[-1].content
-    user_tokens = task_result.messages[-1].models_usage.prompt_tokens
-    assistant_tokens = task_result.messages[-1].models_usage.completion_tokens
-    run_cost_usd = calculate_run_cost_usd(user_tokens, assistant_tokens)
-
-    logger.info(
-        "Prediagnose token usage (chat_id=%s, prompt_tokens=%s, completion_tokens=%s, run_cost_usd=%.8f)",
-        resolved_chat_id,
-        user_tokens,
-        assistant_tokens,
-        run_cost_usd,
-    )
-    
-    return PrediagnoseAIResult(
-        response=ai_response,
-        llm_prompt_tokens=user_tokens,
-        llm_completion_tokens=assistant_tokens,
-        llm_cost_usd=run_cost_usd,
-    )
-
 
 @router.post("", response_model=ChatResponse)
 async def prediagnose_chat_endpoint(msg: ChatMessage):
@@ -107,9 +39,20 @@ async def prediagnose_chat_endpoint(msg: ChatMessage):
     """
     try:
         unified = to_unified_message(msg)
+
+        async def _ai_processor(
+            chat_id: str | None,
+            message: str,
+            user_id: str | None = None,
+        ):
+            resolved_chat_id = chat_id or unified.chat_id
+            with ChatSessionHandler() as handler:
+                full_prompt = handler.build_context_prompt(resolved_chat_id, message)
+            return await process_prediagnose_message(resolved_chat_id, full_prompt)
+
         outbound = await process_unified_message(
             incoming=unified,
-            ai_processor=process_prediagnose_message,
+            ai_processor=_ai_processor,
         )
 
         logger.info(
@@ -258,9 +201,19 @@ async def prediagnose_multimodal_endpoint(
             mime_type=mime_type,
         )
 
+        async def _ai_processor(
+            incoming_chat_id: str | None,
+            message_text: str,
+            incoming_user_id: str | None = None,
+        ):
+            resolved_chat_id = incoming_chat_id or unified.chat_id
+            with ChatSessionHandler() as handler:
+                full_prompt = handler.build_context_prompt(resolved_chat_id, message_text)
+            return await process_prediagnose_message(resolved_chat_id, full_prompt)
+
         outbound = await process_unified_message(
             incoming=unified,
-            ai_processor=process_prediagnose_message,
+            ai_processor=_ai_processor,
         )
 
         llm_usage = outbound.metadata.get("llm_usage", {}) if outbound.metadata else {}

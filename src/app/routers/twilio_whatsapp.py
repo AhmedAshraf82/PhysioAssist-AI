@@ -6,7 +6,8 @@ from fastapi import APIRouter, BackgroundTasks, Form
 from fastapi.responses import Response
 
 from src.app.core.config import settings
-from src.app.routers.prediagnose import process_prediagnose_message
+from src.app.services.chats.prediagnose_chat_service import process_prediagnose_message
+from src.app.services.db_handler.chat_session_handler import ChatSessionHandler
 
 logger = logging.getLogger(__name__)
 
@@ -47,10 +48,13 @@ async def _send_twilio_whatsapp_message(to_number: str, body: str) -> None:
 
 async def _process_and_send_reply(user_id: str, user_text: str, message_sid: str) -> None:
     try:
+        chat_id = f"twilio_{user_id}"
+        with ChatSessionHandler() as handler:
+            full_prompt = handler.build_context_prompt(chat_id, user_text)
+
         chat_response = await process_prediagnose_message(
-            chat_id=f"twilio_{user_id}",
-            message=user_text,
-            user_id=f"twilio:{user_id}",
+            chat_id=chat_id,
+            full_prompt=full_prompt,
         )
         await _send_twilio_whatsapp_message(user_id, chat_response.response)
     except Exception as e:

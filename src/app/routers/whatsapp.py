@@ -15,7 +15,7 @@ from src.app.models.whatsapp import (
     WhatsAppSendMessageResponse,
 )
 from src.app.models.channel_models import MessageType
-from src.app.routers.prediagnose import process_prediagnose_message
+from src.app.services.chats.prediagnose_chat_service import process_prediagnose_message
 from src.app.services.channels.adapters.whatsapp_adapter import (
     to_unified_message,
     to_unified_multimodal_message,
@@ -449,9 +449,20 @@ async def handle_whatsapp_webhook(
                 )
 
                 try:
+                    async def _ai_processor(
+                        chat_id: str | None,
+                        message: str,
+                        user_id: str | None = None,
+                    ):
+                        del user_id
+                        resolved_chat_id = chat_id or unified.chat_id
+                        with ChatSessionHandler() as handler:
+                            full_prompt = handler.build_context_prompt(resolved_chat_id, message)
+                        return await process_prediagnose_message(resolved_chat_id, full_prompt)
+
                     outbound = await process_unified_message(
                         incoming=unified,
-                        ai_processor=process_prediagnose_message,
+                        ai_processor=_ai_processor,
                     )
                     logger.info(
                         "WhatsApp webhook: outbound generated (chat_id=%s, should_send_voice=%s, has_voice_audio=%s)",

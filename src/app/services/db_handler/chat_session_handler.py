@@ -169,6 +169,37 @@ class ChatSessionHandler(MongoDBHandler):
             return []
         
         return session.get("messages", [])
+
+    def build_context_prompt(self, chat_id: str, message: str) -> str:
+        """
+        Build a full prompt by combining chat history context with current user message.
+
+        Args:
+            chat_id: Chat session identifier
+            message: Current user message
+
+        Returns:
+            str: Prompt with previous conversation context when available
+        """
+        all_messages = self.get_messages(chat_id)
+        context_messages: List[str] = []
+
+        for prior_message in all_messages:
+            role = prior_message.get("role", "user")
+            content = prior_message.get("content", "")
+            if role == "user":
+                context_messages.append(f"User: {content}")
+            elif role == "assistant":
+                context_messages.append(f"Assistant: {content}")
+
+        if context_messages:
+            return (
+                "Previous conversation:\n"
+                + "\n".join(context_messages)
+                + f"\n\nUser: {message}"
+            )
+
+        return message
     
     def get_message_count(self, chat_id: str) -> int:
         """
