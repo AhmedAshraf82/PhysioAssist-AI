@@ -77,6 +77,8 @@ if "last_reply_audio_bytes" not in st.session_state:
     st.session_state.last_reply_audio_bytes = None
 if "last_reply_audio_mime" not in st.session_state:
     st.session_state.last_reply_audio_mime = None
+if "wa_numbers" not in st.session_state:
+    st.session_state.wa_numbers = []
 
 
 def get_or_create_user_id() -> str:
@@ -287,6 +289,32 @@ def get_latest_user_session(user_id: str) -> Dict[str, Any] | None:
         return None
 
 
+def send_whatsapp_bulk_message(numbers: List[str], message: str) -> Dict[str, Any] | None:
+    """Send a text message to multiple WhatsApp numbers via backend endpoint."""
+    try:
+        response = requests.post(
+            f"{API_BASE_URL}/webhooks/whatsapp/send-text",
+            json={"numbers": numbers, "message": message},
+            timeout=90,
+        )
+
+        if response.status_code == 200:
+            return response.json()
+
+        try:
+            detail = response.json().get("detail", "")
+        except Exception:
+            detail = response.text
+        st.error(f"WhatsApp send failed: {response.status_code} {detail}")
+        return None
+    except requests.exceptions.ConnectionError:
+        st.error("⚠️ Cannot connect to API server")
+        return None
+    except Exception as e:
+        st.error(f"Failed to send WhatsApp message: {str(e)[:100]}")
+        return None
+
+
 # Header
 st.markdown('<h1 class="main-header">🏥 PhysioAssist AI</h1>', unsafe_allow_html=True)
 
@@ -318,6 +346,51 @@ st.markdown("---")
 # Sidebar for controls
 with st.sidebar:
     st.header("⚙️ Controls")
+
+    st.subheader("📲 WhatsApp Sender")
+    wa_number_input = st.text_input(
+        "Add phone number",
+        placeholder="201090253864",
+        help="Use 201... format. +201... and 01... are accepted and normalized by backend.",
+    )
+    if st.button("➕ Add Number", use_container_width=True):
+        candidate = (wa_number_input or "").strip()
+        if not candidate:
+            st.warning("Please enter a number")
+        elif candidate in st.session_state.wa_numbers:
+            st.info("Number already added")
+        else:
+            st.session_state.wa_numbers.append(candidate)
+
+    if st.session_state.wa_numbers:
+        st.caption("Recipients")
+        for idx, number in enumerate(st.session_state.wa_numbers):
+            col_num, col_remove = st.columns([5, 1])
+            with col_num:
+                st.write(number)
+            with col_remove:
+                if st.button("✖", key=f"wa_remove_{idx}"):
+                    st.session_state.wa_numbers.pop(idx)
+                    st.rerun()
+
+        wa_message = st.text_area(
+            "WhatsApp message",
+            placeholder="Type message to send...",
+            height=80,
+            key="wa_bulk_message",
+        )
+        if st.button("📤 Send WhatsApp Message", use_container_width=True):
+            if not wa_message.strip():
+                st.warning("Please enter a message")
+            else:
+                with st.spinner("Sending WhatsApp message(s)..."):
+                    result = send_whatsapp_bulk_message(st.session_state.wa_numbers, wa_message.strip())
+                if result:
+                    st.success(
+                        f"Status: {result.get('status')} | sent: {result.get('sent_count', 0)} | failed: {result.get('failed_count', 0)}"
+                    )
+
+    st.markdown("---")
     
     # Data Ingestion Section
     st.subheader("📊 Data Management")
