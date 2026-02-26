@@ -35,8 +35,8 @@ class MultimodalChatResponse(ChatResponse):
     reply_audio_mime_type: Optional[str] = None
 
 
-class PrediagnoseAIResult(BaseModel):
-    """Internal model carrying prediagnosis AI output and token usage."""
+class ChatAIResult(BaseModel):
+    """Internal model carrying chat AI output and token usage."""
 
     response: str
     llm_prompt_tokens: int = 0

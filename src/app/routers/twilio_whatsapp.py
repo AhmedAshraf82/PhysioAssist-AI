@@ -6,7 +6,10 @@ from fastapi import APIRouter, BackgroundTasks, Form
 from fastapi.responses import Response
 
 from src.app.core.config import settings
-from src.app.services.chats.prediagnose_chat_service import process_prediagnose_message
+from src.app.services.chats.chat_service import (
+    persist_text_chat_turn,
+    process_chat_message,
+)
 from src.app.services.db_handler.chat_session_handler import ChatSessionHandler
 
 logger = logging.getLogger(__name__)
@@ -52,10 +55,27 @@ async def _process_and_send_reply(user_id: str, user_text: str, message_sid: str
         with ChatSessionHandler() as handler:
             full_prompt = handler.build_context_prompt(chat_id, user_text)
 
-        chat_response = await process_prediagnose_message(
+        chat_response = await process_chat_message(
             chat_id=chat_id,
             full_prompt=full_prompt,
         )
+
+        try:
+            persist_text_chat_turn(
+                chat_id=chat_id,
+                user_id=f"twilio:{user_id}",
+                user_text=user_text,
+                assistant_text=chat_response.response,
+                ai_result=chat_response,
+                user_mime_type="TEXT",
+            )
+        except Exception as persist_exc:
+            logger.exception(
+                "Twilio webhook: failed to persist chat turn for %s: %s",
+                message_sid,
+                str(persist_exc),
+            )
+
         await _send_twilio_whatsapp_message(user_id, chat_response.response)
     except Exception as e:
         logger.exception("Twilio WhatsApp processing failed for %s: %s", message_sid, str(e))

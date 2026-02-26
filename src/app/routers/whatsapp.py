@@ -15,12 +15,14 @@ from src.app.models.whatsapp import (
     WhatsAppSendMessageResponse,
 )
 from src.app.models.channel_models import MessageType
-from src.app.services.chats.prediagnose_chat_service import process_prediagnose_message
+from src.app.services.chats.chat_service import (
+    persist_unified_chat_turn,
+    process_unified_chat_message,
+)
 from src.app.services.channels.adapters.whatsapp_adapter import (
     to_unified_message,
     to_unified_multimodal_message,
 )
-from src.app.services.channels.orchestrator import process_unified_message
 from src.app.services.db_handler.chat_session_handler import ChatSessionHandler
 
 logger = logging.getLogger(__name__)
@@ -386,7 +388,7 @@ async def handle_whatsapp_webhook(
     request: Request,
     x_hub_signature_256: str | None = Header(default=None),
 ):
-    """Receive inbound WhatsApp messages and reply using prediagnose chat flow."""
+    """Receive inbound WhatsApp messages and reply using chat flow."""
     raw_body = await request.body()
     if not _is_valid_signature(raw_body, x_hub_signature_256):
         raise HTTPException(status_code=401, detail="Invalid webhook signature")
@@ -449,27 +451,29 @@ async def handle_whatsapp_webhook(
                 )
 
                 try:
-                    async def _ai_processor(
-                        chat_id: str | None,
-                        message: str,
-                        user_id: str | None = None,
-                    ):
-                        del user_id
-                        resolved_chat_id = chat_id or unified.chat_id
-                        with ChatSessionHandler() as handler:
-                            full_prompt = handler.build_context_prompt(resolved_chat_id, message)
-                        return await process_prediagnose_message(resolved_chat_id, full_prompt)
-
-                    outbound = await process_unified_message(
-                        incoming=unified,
-                        ai_processor=_ai_processor,
-                    )
+                    outbound = await process_unified_chat_message(unified)
                     logger.info(
                         "WhatsApp webhook: outbound generated (chat_id=%s, should_send_voice=%s, has_voice_audio=%s)",
                         unified.chat_id,
                         outbound.should_send_voice,
                         bool(outbound.voice_audio),
                     )
+
+                    try:
+                        fallback_user_text = unified.text or f"[{unified.message_type.value} message]"
+                        persist_unified_chat_turn(
+                            unified=unified,
+                            outbound=outbound,
+                            fallback_user_text=fallback_user_text,
+                            user_mime_type=unified.message_type.value.upper(),
+                        )
+                    except Exception as persist_exc:
+                        logger.exception(
+                            "WhatsApp webhook: failed to persist chat turn for chat_id=%s: %s",
+                            unified.chat_id,
+                            str(persist_exc),
+                        )
+
                     recipient_wa_id = str(unified.metadata.get("whatsapp_from", "")).strip()
                     if not recipient_wa_id:
                         logger.warning("WhatsApp webhook: missing recipient_wa_id for chat_id=%s", unified.chat_id)

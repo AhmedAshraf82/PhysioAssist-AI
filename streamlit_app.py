@@ -101,7 +101,7 @@ def get_or_create_user_id() -> str:
 def load_chat_history(chat_id: str) -> List[Dict[str, Any]]:
     """Load chat history from API."""
     try:
-        response = requests.get(f"{API_BASE_URL}/prediagnose/{chat_id}/history", timeout=90)
+        response = requests.get(f"{API_BASE_URL}/chat/{chat_id}/history", timeout=90)
         if response.status_code == 200:
             data = response.json()
             return data.get("history", [])
@@ -115,7 +115,7 @@ def load_chat_history(chat_id: str) -> List[Dict[str, Any]]:
 
 
 def send_message(message: str, chat_id: str = None, user_id: str = None) -> Dict[str, Any]:
-    """Send message to prediagnose endpoint."""
+    """Send message to chat endpoint."""
     try:
         payload = {"message": message}
         if chat_id:
@@ -124,7 +124,7 @@ def send_message(message: str, chat_id: str = None, user_id: str = None) -> Dict
             payload["user_id"] = user_id
         
         response = requests.post(
-            f"{API_BASE_URL}/prediagnose",
+            f"{API_BASE_URL}/chat",
             json=payload,
             timeout=30
         )
@@ -148,7 +148,7 @@ def send_multimodal_message(
     user_id: str = None,
     uploaded_file=None,
 ) -> Dict[str, Any]:
-    """Send text and/or media to multimodal prediagnose endpoint."""
+    """Send text and/or media to multimodal chat endpoint."""
     try:
         data = {}
         if message:
@@ -169,7 +169,7 @@ def send_multimodal_message(
             }
 
         response = requests.post(
-            f"{API_BASE_URL}/prediagnose/multimodal",
+            f"{API_BASE_URL}/chat/multimodal",
             data=data,
             files=files,
             timeout=90,
@@ -230,7 +230,7 @@ def trigger_ingestion(recreate_index: bool = False) -> Dict[str, Any]:
 def list_sessions() -> List[Dict[str, Any]]:
     """List all chat sessions."""
     try:
-        response = requests.get(f"{API_BASE_URL}/prediagnose/sessions", timeout=90)
+        response = requests.get(f"{API_BASE_URL}/chat/sessions", timeout=90)
         if response.status_code == 200:
             data = response.json()
             return data.get("sessions", [])
@@ -249,7 +249,7 @@ def list_sessions() -> List[Dict[str, Any]]:
 def delete_session(chat_id: str) -> bool:
     """Delete a single chat session."""
     try:
-        response = requests.delete(f"{API_BASE_URL}/prediagnose/{chat_id}", timeout=30)
+        response = requests.delete(f"{API_BASE_URL}/chat/{chat_id}", timeout=30)
         return response.status_code == 200
     except Exception:
         return False
@@ -258,7 +258,7 @@ def delete_session(chat_id: str) -> bool:
 def clear_all_sessions() -> int:
     """Delete all chat sessions and return deleted count."""
     try:
-        response = requests.delete(f"{API_BASE_URL}/prediagnose/sessions/all", timeout=30)
+        response = requests.delete(f"{API_BASE_URL}/chat/sessions/all", timeout=30)
         if response.status_code == 200:
             return int(response.json().get("deleted_count", 0))
         return 0
@@ -279,7 +279,7 @@ def get_latest_user_session(user_id: str) -> Dict[str, Any] | None:
     """Get latest session for a user from API."""
     try:
         response = requests.get(
-            f"{API_BASE_URL}/prediagnose/user/{user_id}/latest",
+            f"{API_BASE_URL}/chat/user/{user_id}/latest",
             timeout=30,
         )
         if response.status_code == 200:

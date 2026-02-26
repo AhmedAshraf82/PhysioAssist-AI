@@ -5,7 +5,7 @@ import uvicorn
 from dotenv import load_dotenv
 
 from src.app.routers import (
-    prediagnose,
+    chat,
     ingestion,
     search,
     injuries,
@@ -23,7 +23,7 @@ app = FastAPI(
 )
 
 # Include routers
-app.include_router(prediagnose.router)
+app.include_router(chat.router)
 app.include_router(ingestion.router)
 app.include_router(search.router)
 app.include_router(injuries.router)
