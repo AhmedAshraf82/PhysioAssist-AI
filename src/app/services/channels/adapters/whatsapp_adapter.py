@@ -74,3 +74,26 @@ def to_unified_message(message: dict[str, Any]) -> UnifiedInboundMessage | None:
             "whatsapp_type": raw_type,
         },
     )
+
+
+def to_unified_multimodal_message(
+    *,
+    wa_id: str,
+    message_type: MessageType,
+    text: str | None,
+    media_bytes: bytes | None,
+    mime_type: str | None,
+) -> UnifiedInboundMessage:
+    """Build a normalized WhatsApp unified message from explicit inputs."""
+    return UnifiedInboundMessage(
+        channel=ChannelType.WHATSAPP,
+        message_type=message_type,
+        user_id=f"wa:{wa_id}",
+        chat_id=f"wa_{wa_id}",
+        text=text,
+        media_bytes=media_bytes,
+        mime_type=mime_type,
+        metadata={
+            "whatsapp_from": wa_id,
+        },
+    )

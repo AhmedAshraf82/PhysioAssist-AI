@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import logging
+import time
 from typing import Any
 
 import httpx
@@ -8,14 +9,59 @@ from fastapi import APIRouter, Header, HTTPException, Query, Request
 from fastapi.responses import PlainTextResponse
 
 from src.app.core.config import settings
+from src.app.models.whatsapp import (
+    WhatsAppSendMessageItemResult,
+    WhatsAppSendMessageRequest,
+    WhatsAppSendMessageResponse,
+)
+from src.app.models.channel_models import MessageType
 from src.app.routers.prediagnose import process_prediagnose_message
-from src.app.services.channels.adapters.whatsapp_adapter import to_unified_message
+from src.app.services.channels.adapters.whatsapp_adapter import (
+    to_unified_message,
+    to_unified_multimodal_message,
+)
 from src.app.services.channels.orchestrator import process_unified_message
-from src.app.services.db_handler.whatsapp_event_handler import WhatsAppEventHandler
+from src.app.services.db_handler.chat_session_handler import ChatSessionHandler
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/webhooks/whatsapp", tags=["WhatsApp"])
+
+_recent_whatsapp_message_ids: dict[str, float] = {}
+
+
+def _is_duplicate_inbound_message(message_id: str, ttl_seconds: int = 600) -> bool:
+    """In-memory dedupe for webhook retries without creating extra DB collections."""
+    if not message_id:
+        return False
+
+    now = time.time()
+
+    # Opportunistic cleanup of stale ids.
+    stale_ids = [mid for mid, ts in _recent_whatsapp_message_ids.items() if now - ts > ttl_seconds]
+    for mid in stale_ids:
+        _recent_whatsapp_message_ids.pop(mid, None)
+
+    last_seen = _recent_whatsapp_message_ids.get(message_id)
+    if last_seen is not None and (now - last_seen) <= ttl_seconds:
+        return True
+
+    _recent_whatsapp_message_ids[message_id] = now
+    return False
+
+
+def _normalize_to_wa_id(raw_to: str) -> str:
+    """
+    Normalize recipient number to WhatsApp Cloud API format.
+
+    Rules:
+    - Remove non-digits (e.g., '+' and spaces)
+    - If starts with local Egyptian mobile format 01..., convert to 201...
+    """
+    digits = "".join(ch for ch in (raw_to or "") if ch.isdigit())
+    if digits.startswith("01"):
+        return f"2{digits}"
+    return digits
 
 
 def _messages_endpoint() -> str:
@@ -158,7 +204,7 @@ async def send_whatsapp_text(to_wa_id: str, text: str) -> None:
         "messaging_product": "whatsapp",
         "to": to_wa_id,
         "type": "text",
-        "text": {"body": text[:4096]},
+        "text": {"body": text},
     }
 
     response = await _send_payload(payload)
@@ -188,6 +234,117 @@ async def send_whatsapp_text(to_wa_id: str, text: str) -> None:
             status_code=502,
             detail="Failed sending WhatsApp message via Graph API",
         )
+
+
+@router.post("/send-text", response_model=WhatsAppSendMessageResponse)
+async def send_whatsapp_text_to_user(req: WhatsAppSendMessageRequest):
+    """
+    Send a bot text message to multiple WhatsApp users and persist each in MongoDB.
+    """
+    text = (req.message or "").strip()
+
+    if not req.numbers:
+        raise HTTPException(status_code=400, detail="numbers is required")
+    if not text:
+        raise HTTPException(status_code=400, detail="message is required")
+
+    results: list[WhatsAppSendMessageItemResult] = []
+
+    with ChatSessionHandler() as handler:
+        for raw_number in req.numbers:
+            recipient_wa_id = _normalize_to_wa_id(raw_number)
+
+            if not recipient_wa_id:
+                results.append(
+                    WhatsAppSendMessageItemResult(
+                        to=str(raw_number),
+                        chat_id="",
+                        message=text,
+                        status="failed",
+                        error="Invalid recipient number",
+                    )
+                )
+                continue
+
+            unified = to_unified_multimodal_message(
+                wa_id=recipient_wa_id,
+                message_type=MessageType.TEXT,
+                text=text,
+                media_bytes=None,
+                mime_type=None,
+            )
+
+            resolved_chat_id = unified.chat_id
+            resolved_user_id = unified.user_id
+
+            try:
+                await send_whatsapp_text(recipient_wa_id, text)
+            except Exception as exc:
+                logger.exception(
+                    "WhatsApp send-text: failed sending to %s: %s",
+                    recipient_wa_id,
+                    str(exc),
+                )
+                results.append(
+                    WhatsAppSendMessageItemResult(
+                        to=recipient_wa_id,
+                        chat_id=resolved_chat_id,
+                        message=text,
+                        status="failed",
+                        error=str(exc),
+                    )
+                )
+                continue
+
+            saved = handler.add_message(
+                chat_id=resolved_chat_id,
+                content=text,
+                role="assistant",
+                mime_type="TEXT",
+                user_id=resolved_user_id,
+            )
+
+            if not saved:
+                logger.error(
+                    "WhatsApp send-text: sent but failed to persist in chat_sessions (chat_id=%s)",
+                    resolved_chat_id,
+                )
+                results.append(
+                    WhatsAppSendMessageItemResult(
+                        to=recipient_wa_id,
+                        chat_id=resolved_chat_id,
+                        message=text,
+                        status="failed",
+                        error="Message sent but failed to persist in chat session",
+                    )
+                )
+                continue
+
+            results.append(
+                WhatsAppSendMessageItemResult(
+                    to=recipient_wa_id,
+                    chat_id=resolved_chat_id,
+                    message=text,
+                    status="sent",
+                )
+            )
+
+    sent_count = sum(1 for item in results if item.status == "sent")
+    failed_count = len(results) - sent_count
+
+    overall_status = "sent"
+    if sent_count == 0:
+        overall_status = "failed"
+    elif failed_count > 0:
+        overall_status = "partial"
+
+    return WhatsAppSendMessageResponse(
+        status=overall_status,
+        requested_count=len(req.numbers),
+        sent_count=sent_count,
+        failed_count=failed_count,
+        results=results,
+    )
 
 
 @router.get("", response_class=PlainTextResponse)
@@ -276,13 +433,7 @@ async def handle_whatsapp_webhook(
                     continue
 
                 inbound_message_id = str(unified.metadata.get("whatsapp_message_id", "")).strip()
-                with WhatsAppEventHandler() as event_handler:
-                    is_new_event = event_handler.register_inbound_if_new(
-                        message_id=inbound_message_id,
-                        chat_id=unified.chat_id,
-                    )
-
-                if not is_new_event:
+                if _is_duplicate_inbound_message(inbound_message_id):
                     logger.info(
                         "WhatsApp webhook: duplicate inbound skipped (chat_id=%s, message_id=%s)",
                         unified.chat_id,
