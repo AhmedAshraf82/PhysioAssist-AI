@@ -1,6 +1,8 @@
-"""LLM Factory with provider pattern for autogen model clients."""
+"""LLM Factory with provider pattern for autogen and LangChain model clients."""
 
 from typing import Any
+from langchain.chat_models import init_chat_model
+from langchain_core.language_models import BaseChatModel
 from .providers.openai_provider import OpenAIProvider
 from .providers.gemini_provider import GeminiProvider
 from .providers.grok_provider import GrokProvider
@@ -104,3 +106,58 @@ class LLMFactory:
             list[str]: List of implemented provider names
         """
         return ["openai"]  # TODO: Add others as they are implemented
+
+    @classmethod
+    def create_langchain_model(
+        cls,
+        provider: str,
+        model: str,
+        temperature: float = 0,
+        **kwargs: Any,
+    ) -> BaseChatModel:
+        """Create a LangChain chat model for frameworks like deepagents.
+
+        Supports provider indirection so app code can switch providers without
+        rewriting agent creation logic.
+
+        Args:
+            provider: Provider name (e.g., ``openai``, ``ollama``, ``llama``).
+            model: Model identifier for the provider.
+            temperature: Sampling temperature.
+            **kwargs: Provider-specific kwargs (e.g., ``api_key``, ``base_url``).
+
+        Returns:
+            BaseChatModel: LangChain-compatible chat model.
+        """
+        provider = provider.lower()
+
+        if provider == "openai":
+            return init_chat_model(
+                model=model,
+                model_provider="openai",
+                temperature=temperature,
+                **kwargs,
+            )
+
+        if provider in {"ollama", "llama"}:
+            base_url = kwargs.pop("base_url", "http://localhost:11434")
+            return init_chat_model(
+                model=model,
+                model_provider="ollama",
+                temperature=temperature,
+                base_url=base_url,
+                **kwargs,
+            )
+
+        if provider == "gemini":
+            return init_chat_model(
+                model=model,
+                model_provider="google_genai",
+                temperature=temperature,
+                **kwargs,
+            )
+
+        raise ValueError(
+            f"Unsupported provider for LangChain model creation: {provider}. "
+            "Supported: openai, ollama/llama, gemini"
+        )

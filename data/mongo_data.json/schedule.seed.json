@@ -1,0 +1,37 @@
+[
+  {
+    "date": {"$date": "2026-03-01T10:00:00Z"},
+    "day": "Sunday",
+    "is_scheduled": false,
+    "user_id": null,
+    "doctor": ""
+  },
+  {
+    "date": {"$date": "2026-03-01T12:00:00Z"},
+    "day": "Sunday",
+    "is_scheduled": false,
+    "user_id": null,
+    "doctor": ""
+  },
+  {
+    "date": {"$date": "2026-03-02T17:00:00Z"},
+    "day": "Monday",
+    "is_scheduled": true,
+    "user_id": "wa:201001112223",
+    "doctor": ""
+  },
+  {
+    "date": {"$date": "2026-03-03T13:30:00Z"},
+    "day": "Tuesday",
+    "is_scheduled": true,
+    "user_id": "web:user_123",
+    "doctor": ""
+  },
+  {
+    "date": {"$date": "2026-03-04T15:00:00Z"},
+    "day": "Wednesday",
+    "is_scheduled": false,
+    "user_id": null,
+    "doctor": ""
+  }
+]

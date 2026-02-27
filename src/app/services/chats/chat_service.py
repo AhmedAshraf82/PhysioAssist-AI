@@ -1,20 +1,29 @@
 import logging
 import uuid
+import asyncio
+from functools import lru_cache
 from typing import Awaitable, Callable
 
-from src.app.agents.chat_agent import ChatAgent
+from src.app.deepagents.physiotherapist.physiotherapist import PhysiotherapistAgent
 from src.app.models.channel_models import UnifiedInboundMessage, UnifiedOutboundMessage
 from src.app.models.chat_models import ChatAIResult
 from src.app.services.channels.orchestrator import process_unified_message
 from src.app.services.db_handler.chat_session_handler import ChatSessionHandler
+from src.app.services.db_handler.patient_handler import PatientHandler
 from src.app.utils.token_cost import (
     calculate_run_cost_usd,
     calculate_total_interaction_cost_usd,
+    extract_text_and_usage,
 )
 
 logger = logging.getLogger(__name__)
 
 AiProcessor = Callable[[str | None, str, str | None], Awaitable[object]]
+
+@lru_cache(maxsize=1)
+def _get_deep_agent():
+    """Lazily create and cache the deep agent instance (singleton per process)."""
+    return PhysiotherapistAgent.create_agent()
 
 
 def _build_usage_metadata(
@@ -86,6 +95,18 @@ def build_usage_metadata_from_outbound(
     )
 
 
+def _ensure_patient_row(user_id: str | None, chat_id: str | None) -> None:
+    """Ensure patient stub exists for incoming user (user_id/chat linkage only)."""
+    if not user_id:
+        return
+
+    with PatientHandler() as patient_handler:
+        patient_handler.upsert_patient(
+            user_id=user_id,
+            chat_id=chat_id,
+        )
+
+
 def persist_unified_chat_turn(
     unified: UnifiedInboundMessage,
     outbound: UnifiedOutboundMessage,
@@ -138,6 +159,7 @@ def persist_text_chat_turn(
         tts_audio_output_tokens=0,
         total_run_cost_usd=float(ai_result.llm_cost_usd),
     )
+    _ensure_patient_row(user_id, chat_id)
 
     with ChatSessionHandler() as handler:
         handler.add_message(
@@ -171,7 +193,14 @@ def build_chat_ai_processor(default_chat_id: str) -> AiProcessor:
         resolved_chat_id = chat_id or default_chat_id
         with ChatSessionHandler() as handler:
             full_prompt = handler.build_context_prompt(resolved_chat_id, message)
-        return await process_chat_message(resolved_chat_id, full_prompt)
+        contextual_prompt = (
+            "[SESSION_METADATA]\n"
+            f"chat_id={resolved_chat_id}\n"
+            f"user_id={user_id or ''}\n"
+            "[/SESSION_METADATA]\n\n"
+            f"{full_prompt}"
+        )
+        return await process_chat_message(resolved_chat_id, contextual_prompt)
 
     return _ai_processor
 
@@ -180,6 +209,7 @@ async def process_unified_chat_message(
     incoming: UnifiedInboundMessage,
 ) -> UnifiedOutboundMessage:
     """Run the shared unified-message pipeline using chat ai processor defaults."""
+    _ensure_patient_row(incoming.user_id, incoming.chat_id)
     return await process_unified_message(
         incoming=incoming,
         ai_processor=build_chat_ai_processor(incoming.chat_id),
@@ -193,12 +223,14 @@ async def process_chat_message(
     """Chat model execution for an already-built full prompt."""
     resolved_chat_id = chat_id or str(uuid.uuid4())
 
-    chat_agent = ChatAgent.create_chat_agent(name="PhysioAssist")
-    task_result = await chat_agent.run(task=full_prompt)
+    deep_agent = _get_deep_agent()
+    task_result = await asyncio.to_thread(
+        deep_agent.invoke,
+        {"messages": [{"role": "user", "content": full_prompt}]},
+        {"configurable": {"thread_id": resolved_chat_id}},
+    )
 
-    ai_response = task_result.messages[-1].content
-    user_tokens = task_result.messages[-1].models_usage.prompt_tokens
-    assistant_tokens = task_result.messages[-1].models_usage.completion_tokens
+    ai_response, user_tokens, assistant_tokens = extract_text_and_usage(task_result)
     run_cost_usd = calculate_run_cost_usd(user_tokens, assistant_tokens)
 
     logger.info(

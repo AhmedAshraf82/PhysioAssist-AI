@@ -59,6 +59,11 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str | None = None
     GROK_API_KEY: str | None = None
     GEMINI_API_KEY: str | None = None
+    LANGSMITH_API_KEY: str | None = None
+    LANGSMITH_TRACING: bool = True
+    LANGSMITH_PROJECT: str = "physio"
+    LANGSMITH_ENDPOINT: str | None = None
+    LANGSMITH_WORKSPACE_ID: str | None = None
 
     # LLM defaults (used when not explicitly passed to agent factory)
     LLM_PROVIDER: str = "openai"

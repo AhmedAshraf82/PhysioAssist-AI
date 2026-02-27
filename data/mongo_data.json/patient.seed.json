@@ -1,0 +1,28 @@
+[
+  {
+    "user_id": "wa:201001112223",
+    "full_name": "Ziad Hassan",
+    "phone_number": "201001112223",
+    "diagnosis": "Patellofemoral pain syndrome (right knee)",
+    "medical_history": "mild recurrent low-back pain, no major surgeries",
+    "remaining_sessions": 4,
+    "total_sessions": 12,
+    "appointment_ids": [],
+    "linked_chat_ids": ["wa_201001112223"],
+    "created_at": {"$date": "2026-02-20T10:00:00Z"},
+    "updated_at": {"$date": "2026-02-27T10:00:00Z"}
+  },
+  {
+    "user_id": "web:user_123",
+    "full_name": "Nour Ali",
+    "phone_number": null,
+    "diagnosis": "Shoulder impingement (left)",
+    "medical_history": "desk-job posture strain",
+    "remaining_sessions": 7,
+    "total_sessions": 10,
+    "appointment_ids": [],
+    "linked_chat_ids": ["web_chat_123"],
+    "created_at": {"$date": "2026-02-21T09:30:00Z"},
+    "updated_at": {"$date": "2026-02-27T09:30:00Z"}
+  }
+]

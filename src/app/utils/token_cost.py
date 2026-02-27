@@ -86,3 +86,45 @@ def calculate_total_interaction_cost_usd(
     )
 
     return float(llm_cost + stt_cost + tts_cost)
+
+
+
+
+
+def extract_text_and_usage(agent_result: dict) -> tuple[str, int, int]:
+    """Extract assistant text and token usage from deepagents invoke result."""
+    messages = agent_result.get("messages", [])
+    if not messages:
+        return "", 0, 0
+
+    last = messages[-1]
+    content = getattr(last, "content", "")
+
+    if isinstance(content, str):
+        text = content
+    elif isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, dict):
+                parts.append(str(item.get("text", "")))
+        text = "\n".join(p for p in parts if p).strip()
+    else:
+        text = str(content)
+
+    usage = getattr(last, "usage_metadata", {}) or {}
+    prompt_tokens = int(
+        usage.get("input_tokens")
+        or usage.get("prompt_tokens")
+        or usage.get("input_token_count")
+        or 0
+    )
+    completion_tokens = int(
+        usage.get("output_tokens")
+        or usage.get("completion_tokens")
+        or usage.get("output_token_count")
+        or 0
+    )
+
+    return text, prompt_tokens, completion_tokens
