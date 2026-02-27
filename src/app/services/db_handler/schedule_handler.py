@@ -13,6 +13,16 @@ from src.app.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
+_WEEKDAYS = [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+]
+
 
 class ScheduleHandler(MongoDBHandler):
     """Handler for the `schedule` collection."""
@@ -35,7 +45,43 @@ class ScheduleHandler(MongoDBHandler):
 
     @staticmethod
     def _normalize_day(day: str) -> str:
-        return day.strip().capitalize()
+        raw = (day or "").strip().lower()
+        if not raw:
+            raise ValueError("Day is required.")
+
+        aliases = {
+            "mon": "Monday",
+            "monday": "Monday",
+            "tue": "Tuesday",
+            "tues": "Tuesday",
+            "tuesday": "Tuesday",
+            "wed": "Wednesday",
+            "wednesday": "Wednesday",
+            "thu": "Thursday",
+            "thur": "Thursday",
+            "thurs": "Thursday",
+            "thursday": "Thursday",
+            "fri": "Friday",
+            "friday": "Friday",
+            "sat": "Saturday",
+            "saturday": "Saturday",
+            "sun": "Sunday",
+            "sunday": "Sunday",
+        }
+
+        if raw == "today":
+            return _WEEKDAYS[datetime.utcnow().weekday()]
+
+        if raw == "tomorrow":
+            return _WEEKDAYS[(datetime.utcnow().weekday() + 1) % 7]
+
+        normalized = aliases.get(raw)
+        if normalized:
+            return normalized
+
+        raise ValueError(
+            f"Unsupported day '{day}'. Use a weekday name/abbr or today/tomorrow."
+        )
 
     @staticmethod
     def _parse_time(preferred_time: str) -> tuple[int, int]:
@@ -51,15 +97,7 @@ class ScheduleHandler(MongoDBHandler):
 
     def _next_datetime_for_day_time(self, preferred_day: str, preferred_time: str) -> datetime:
         day = self._normalize_day(preferred_day)
-        target_weekday = [
-            "Monday",
-            "Tuesday",
-            "Wednesday",
-            "Thursday",
-            "Friday",
-            "Saturday",
-            "Sunday",
-        ].index(day)
+        target_weekday = _WEEKDAYS.index(day)
         hour, minute = self._parse_time(preferred_time)
 
         now = datetime.utcnow()

@@ -183,15 +183,18 @@ def schedule_appointment(
         )
 
     with ScheduleHandler() as schedule_handler:
-        appointment = schedule_handler.create_appointment(
-            user_id=resolved_user_id,
-            chat_id=chat_id,
-            patient_name=user_name,
-            preferred_day=preferred_day,
-            preferred_time=preferred_time,
-            clinic_name="V33",
-            clinic_location="El Waha, Cairo",
-        )
+        try:
+            appointment = schedule_handler.create_appointment(
+                user_id=resolved_user_id,
+                chat_id=chat_id,
+                patient_name=user_name,
+                preferred_day=preferred_day,
+                preferred_time=preferred_time,
+                clinic_name="V33",
+                clinic_location="El Waha, Cairo",
+            )
+        except ValueError as e:
+            return f"Could not parse schedule request: {e}"
 
     if not appointment:
         return (
